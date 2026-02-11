@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quantum Labs - Bunsen Burner Update</title>
+    <title>Quantum Labs - Smart Analysis</title>
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     
     <style>
@@ -12,7 +12,7 @@
             --neon-blue: #00f3ff;
             --neon-green: #0aff68;
             --neon-warn: #ff3333;
-            --neon-orange: #ff9f43;
+            --neon-purple: #d63031;
             --glass: rgba(20, 30, 40, 0.9);
             --border: 1px solid rgba(0, 243, 255, 0.2);
         }
@@ -33,29 +33,57 @@
             min-height: 100px; z-index: 10;
         }
         
+        /* --- ORBITAL HOVER EFFECTS --- */
         .element-card {
             min-width: 70px; height: 80px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            cursor: grab; user-select: none; transition: 0.2s; position: relative;
+            cursor: grab; user-select: none; transition: 0.2s; position: relative; overflow: visible;
         }
         .element-card:active { cursor: grabbing; transform: scale(0.95); }
-        .element-card:hover { border-color: var(--neon-blue); background: rgba(0, 243, 255, 0.1); }
+        .element-card:hover { border-color: var(--neon-blue); background: rgba(0, 243, 255, 0.1); z-index: 10; }
         .element-card.dragging { opacity: 0.5; border: 1px dashed var(--neon-blue); }
+
+        /* The Ring */
+        .orbit-ring {
+            position: absolute; width: 90px; height: 90px; border-radius: 50%;
+            border: 1px solid rgba(0, 243, 255, 0.1);
+            opacity: 0; transition: opacity 0.3s; pointer-events: none;
+            animation: spin 3s linear infinite;
+        }
+        .element-card:hover .orbit-ring { opacity: 1; border-color: rgba(0, 243, 255, 0.4); }
+
+        /* The Electron Dots */
+        .electron {
+            position: absolute; top: -4px; left: 50%; width: 6px; height: 6px;
+            background: var(--neon-blue); border-radius: 50%;
+            box-shadow: 0 0 8px var(--neon-blue);
+            transform: translateX(-50%);
+        }
+        .electron:nth-child(2) { top: auto; bottom: -4px; }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .t-liquid { border-bottom: 3px solid var(--neon-blue); }
         .t-acid { border-bottom: 3px solid #ff9f43; }
         .t-solid { border-bottom: 3px solid #f1c40f; }
         .t-gas { border-bottom: 3px solid #bd10e0; }
         
-        .el-sym { font-size: 1.6rem; font-weight: 700; }
-        .el-name { font-size: 0.7rem; font-family: 'JetBrains Mono'; margin-top: 4px; opacity: 0.7; }
+        .el-sym { font-size: 1.6rem; font-weight: 700; position: relative; z-index: 2; }
+        .el-name { font-size: 0.7rem; font-family: 'JetBrains Mono'; margin-top: 4px; opacity: 0.7; z-index: 2; }
 
         .main-stage { flex: 1; display: flex; position: relative; justify-content: center; align-items: center; flex-direction: column; }
         
-        /* VESSEL & APPARATUS */
         .apparatus-cluster {
             position: relative;
             display: flex; flex-direction: column; align-items: center;
+            transition: transform 0.1s;
+        }
+        .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake { 
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
         }
 
         .vessel {
@@ -67,12 +95,6 @@
             z-index: 2;
         }
 
-        .vessel.drag-active {
-            border-color: var(--neon-green);
-            box-shadow: 0 0 30px rgba(10, 255, 104, 0.3);
-        }
-
-        /* THERMOMETER */
         .thermometer-wrapper {
             position: absolute; left: -60px; bottom: 50px; height: 300px; width: 40px;
             display: flex; flex-direction: column; align-items: center;
@@ -83,7 +105,7 @@
             position: relative; overflow: hidden;
         }
         .thermometer-mercury {
-            position: absolute; bottom: 0; width: 100%; height: 25%; /* Start at room temp */
+            position: absolute; bottom: 0; width: 100%; height: 25%;
             background: linear-gradient(to top, #ff3333, #ff9f43);
             transition: height 0.5s ease;
         }
@@ -96,7 +118,6 @@
             background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 4px;
         }
 
-        /* HEATER */
         .heater-base {
             width: 200px; height: 40px; background: #2d3436;
             border-radius: 5px; margin-top: 20px;
@@ -125,26 +146,6 @@
         }
         @keyframes flicker { from { transform: scale(1); opacity: 0.8; } to { transform: scale(1.1); opacity: 1; } }
 
-        /* HEAT CONTROL UI */
-        .control-panel {
-            margin-top: 20px; display: flex; gap: 20px; align-items: center;
-        }
-        .switch {
-            position: relative; display: inline-block; width: 60px; height: 34px;
-        }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider {
-            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #ccc; transition: .4s; border-radius: 34px;
-        }
-        .slider:before {
-            position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px;
-            background-color: white; transition: .4s; border-radius: 50%;
-        }
-        input:checked + .slider { background-color: var(--neon-warn); box-shadow: 0 0 15px var(--neon-warn); }
-        input:checked + .slider:before { transform: translateX(26px); }
-
-        /* LIQUIDS & ATOMS */
         .liquid {
             position: absolute; bottom: 0; width: 100%; height: 0%;
             background: rgba(0, 243, 255, 0.3);
@@ -158,23 +159,30 @@
             display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.8rem;
             box-shadow: 0 0 10px rgba(255,255,255,0.5);
             animation: fallIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            transition: opacity 0.5s, transform 0.5s;
             z-index: 10;
         }
+        .atom.dissolving { opacity: 0; transform: scale(0); }
         @keyframes fallIn { from { top: -50px; } to { top: 85%; } }
         
-        /* Atom Variants */
         .atom.gas { background: rgba(255,255,255,0.1); border: 2px solid #bd10e0; color: #bd10e0; animation: floatUp 4s infinite linear; }
         .atom.gas-green { background: rgba(106, 176, 76, 0.2); border: 2px solid #6ab04c; color: #badc58; animation: floatUp 4s infinite linear; }
         .atom.gas-blue { background: rgba(52, 152, 219,0.2); border: 2px solid #3498db; color: #3498db; animation: floatUp 4s infinite linear; }
         .atom.metal { background: #e2e8f0; color: #1e293b; border: 1px solid #94a3b8; }
         .atom.gold { background: #facc15; border: 1px solid #eab308; color: #000; }
         .atom.copper { background: #f97316; border: 1px solid #c2410c; }
-        .atom.sulfur { background: #fef08a; color: #854d0e; border: 1px solid #facc15; }
         .atom.iron { background: #576574; color: white; border: 1px solid #222f3e; }
         .atom.carbon { background: #2d3436; color: #dfe6e9; border: 1px solid #000; }
-        .atom.iodine { background: #4834d4; color: #be2edd; border: 1px solid #686de0; }
 
         @keyframes floatUp { 0% { top: 90%; opacity: 0; } 20% { opacity: 1; } 100% { top: -20px; opacity: 0; } }
+
+        .control-panel { margin-top: 20px; display: flex; gap: 20px; align-items: center; }
+        .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--neon-warn); box-shadow: 0 0 15px var(--neon-warn); }
+        input:checked + .slider:before { transform: translateX(26px); }
 
         .analysis-panel {
             position: absolute; right: 20px; top: 100px; width: 350px;
@@ -184,34 +192,52 @@
             z-index: 100;
         }
         .analysis-panel.active { opacity: 1; pointer-events: auto; transform: translateY(0); }
-        
-        .chem-eq { 
-            background: rgba(0,0,0,0.4); padding: 10px; border-radius: 6px; 
-            font-family: 'JetBrains Mono'; color: var(--neon-green); margin: 10px 0; border: 1px solid rgba(10, 255, 104, 0.3);
-        }
+        .chem-eq { background: rgba(0,0,0,0.4); padding: 10px; border-radius: 6px; font-family: 'JetBrains Mono'; color: var(--neon-green); margin: 10px 0; border: 1px solid rgba(10, 255, 104, 0.3); }
         .explanation { font-size: 0.9rem; line-height: 1.5; color: #cbd5e1; }
-        
-        .btn {
-            background: transparent; border: 1px solid var(--neon-warn); color: var(--neon-warn);
-            padding: 8px 16px; cursor: pointer; font-family: 'Rajdhani'; font-weight: bold;
-            transition: 0.2s;
-        }
+        .status-badge { display:inline-block; padding:2px 6px; border-radius:4px; background:#e17055; font-size:0.7rem; margin-bottom:5px; font-weight:bold;}
+        .btn { background: transparent; border: 1px solid var(--neon-warn); color: var(--neon-warn); padding: 8px 16px; cursor: pointer; font-family: 'Rajdhani'; font-weight: bold; transition: 0.2s; }
         .btn:hover { background: var(--neon-warn); color: white; }
 
-        #fume-container { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+        /* Notification Toast */
+        .toast {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(30, 40, 50, 0.9); border: 1px solid rgba(255,255,255,0.2);
+            padding: 10px 20px; border-radius: 8px; font-family: 'JetBrains Mono'; font-size: 0.8rem;
+            color: white; pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 2000;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .toast.active { opacity: 1; }
+        .toast-icon { font-size: 1.2rem; }
+
+        #fx-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 50; }
+        
         .fume {
-            position: absolute; width: 60px; height: 60px; background: orange;
-            border-radius: 50%; opacity: 0.6; filter: blur(20px);
-            animation: riseFume 3s forwards;
+            position: absolute; width: 60px; height: 60px; border-radius: 50%; 
+            opacity: 0.6; filter: blur(20px); animation: riseFume 3s forwards;
         }
         @keyframes riseFume { to { transform: translateY(-300px) scale(2); opacity: 0; } }
+
+        .ex-particle {
+            position: absolute; width: 10px; height: 10px; border-radius: 50%;
+            animation: explode 0.8s ease-out forwards;
+        }
+        @keyframes explode {
+            0% { transform: translate(0,0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
+        }
+
+        .flash-overlay {
+            position: fixed; inset: 0; background: white; pointer-events: none; z-index: 999;
+            animation: flashAnim 0.3s ease-out forwards;
+        }
+        @keyframes flashAnim { 0% { opacity: 1; } 100% { opacity: 0; } }
 
     </style>
 </head>
 <body>
 
     <header>
-        <h1>⚛️ QUANTUM LAB <span style="color:var(--neon-blue); font-size:0.8rem">v3.1</span></h1>
+        <h1>⚛️ QUANTUM LAB <span style="color:var(--neon-blue); font-size:0.8rem">v5.0 INTELLIGENT</span></h1>
         <div style="font-family: 'JetBrains Mono'; color: rgba(255,255,255,0.5); font-size: 0.8rem;">
             <span id="el-count">0</span> ELEMENTS LOADED
         </div>
@@ -222,10 +248,15 @@
 
     <div class="main-stage">
         
-        <div class="apparatus-cluster">
+        <div class="toast" id="toast">
+            <span class="toast-icon">ℹ️</span>
+            <span id="toast-msg">No Reaction</span>
+        </div>
+
+        <div class="apparatus-cluster" id="apparatus">
             <div class="vessel" id="drop-zone">
                 <div class="liquid" id="liquid"></div>
-                <div id="fume-container"></div>
+                <div id="fx-layer"></div>
                 <div class="atom-container" id="atoms"></div>
 
                 <div class="thermometer-wrapper">
@@ -256,7 +287,8 @@
         </div>
 
         <div class="analysis-panel" id="analysis">
-            <h3 style="margin:0 0 10px 0; color:white;">REACTION DETECTED</h3>
+            <span class="status-badge" id="chem-state-badge">NEUTRAL</span>
+            <h3 style="margin:5px 0 10px 0; color:white;">REACTION LOG</h3>
             <div class="chem-eq" id="eq-display"></div>
             <div class="explanation" id="why-display"></div>
             <button onclick="closeAnalysis()" style="margin-top:15px; background:rgba(255,255,255,0.1); border:none; color:white; padding:5px 10px; cursor:pointer;">Close</button>
@@ -280,22 +312,44 @@
             { id: 'Au', n: 'Gold', t: 'solid', class: 'gold' },
             { id: 'C',  n: 'Carbon', t: 'solid', class: 'carbon' },
             { id: 'Cl2', n: 'Chlorine', t: 'gas', class: 'gas-green' },
-            { id: 'O2', n: 'Oxygen', t: 'gas', class: 'gas-blue' } // NEW ELEMENT
+            { id: 'O2', n: 'Oxygen', t: 'gas', class: 'gas-blue' }
         ];
 
-        // Update the counter in the header
+        const reactivitySeries = {
+            'K': 10, 'Na': 9, 'Ca': 8, 'Mg': 7, 'Al': 6, 
+            'Zn': 5, 'Fe': 4, 'Cu': 2, 'Au': 0, 
+            'C': 1
+        };
+
         document.getElementById('el-count').innerText = elements.length;
 
-        let state = { liquid: null, solids: [], gases: [], reacted: false };
+        let state = { 
+            liquid: null, 
+            chemType: 'neutral', 
+            solids: [], // Stores objects { id: 'Na', checked: false }
+            gases: [], 
+            cooldown: false 
+        };
         let tempState = { current: 25, target: 25, heating: false };
 
-        // --- Drag & Drop Setup ---
         const strip = document.getElementById('element-strip');
+        
+        // --- CREATE ELEMENTS WITH ORBITAL FX ---
         elements.forEach(el => {
             const div = document.createElement('div');
             div.className = `element-card t-${el.t}`;
             div.setAttribute('draggable', true);
-            div.innerHTML = `<span class="el-sym">${el.id.replace(/\d/g, sub => `<sub>${sub}</sub>`)}</span><span class="el-name">${el.n}</span>`;
+            
+            // Add Orbital Rings
+            div.innerHTML = `
+                <div class="orbit-ring">
+                    <div class="electron"></div>
+                    <div class="electron"></div>
+                </div>
+                <span class="el-sym">${el.id.replace(/\d/g, sub => `<sub>${sub}</sub>`)}</span>
+                <span class="el-name">${el.n}</span>
+            `;
+            
             div.onclick = () => addElement(el);
             div.addEventListener('dragstart', (e) => {
                 div.classList.add('dragging');
@@ -313,33 +367,36 @@
             try { addElement(JSON.parse(e.dataTransfer.getData('application/json'))); } catch (err) {}
         });
 
-        // --- Core Logic ---
-
         function addElement(el) {
-            state.reacted = false;
             if (['liquid', 'acid'].includes(el.t)) {
+                if (state.chemType === 'base' && el.t === 'acid') {
+                     triggerReaction('NEUTRALIZATION', { eq: `OH⁻ + H⁺ → H₂O + Salt`, why: `Adding ${el.n} neutralized the basic solution.` });
+                     state.chemType = 'neutral';
+                     setLiquidColor('rgba(10, 255, 104, 0.4)');
+                     createFumes(5, 'white');
+                     return;
+                }
                 if (state.liquid && state.liquid !== el.id) {
-                    alert("Please flush the vessel before mixing different liquids."); 
-                    return;
+                    showToast(`Cannot mix ${el.n} into current liquid without flushing.`); return;
                 }
                 state.liquid = el.id;
+                state.chemType = el.t === 'acid' ? 'acid' : 'neutral';
                 updateLiquidVisuals(el.color);
             } else if (el.t === 'gas') {
-                state.gases.push(el.id);
+                if (!state.gases.includes(el.id)) state.gases.push(el.id);
                 spawnAtom(el);
             } else {
-                state.solids.push(el.id);
+                // Add solid with 'checked' flag set to false
+                state.solids.push({ id: el.id, checked: false });
                 spawnAtom(el);
             }
-            scanBeaker(); // Initial check on drop
+            scanBeaker();
         }
-
-        // --- Heat Logic ---
 
         function toggleHeater() {
             tempState.heating = document.getElementById('heater-toggle').checked;
             document.getElementById('flame-effect').classList.toggle('active', tempState.heating);
-            tempState.target = tempState.heating ? 250 : 25; // Heat up to 250C to allow combustion
+            tempState.target = tempState.heating ? 250 : 25;
         }
 
         setInterval(() => {
@@ -355,92 +412,172 @@
             const display = document.getElementById('temp-display');
             const mercury = document.getElementById('mercury');
             
-            // Map 0-250C to 0-100% height
             let heightPerc = (tempState.current / 250) * 100;
-            if(heightPerc < 5) heightPerc = 5;
-            if(heightPerc > 100) heightPerc = 100;
+            if(heightPerc < 5) heightPerc = 5; if(heightPerc > 100) heightPerc = 100;
 
             display.innerText = Math.round(tempState.current) + '°C';
             mercury.style.height = heightPerc + '%';
+        }
 
-            const liq = document.getElementById('liquid');
-            if(state.liquid) {
-                if(tempState.current > 90) {
-                    if(Math.random() > 0.7) createBubbles(1);
-                    display.style.color = '#ff3333';
-                } else {
-                    display.style.color = 'white';
+        // --- SMART SCANNER ---
+        function scanBeaker() {
+            if(state.cooldown) return; 
+
+            const { liquid, solids, gases, chemType } = state;
+            const temp = tempState.current;
+            
+            // Sort solids by reactivity
+            state.solids.sort((a, b) => (reactivitySeries[b.id] || 0) - (reactivitySeries[a.id] || 0));
+
+            // We iterate through solids. If something reacts, we stop.
+            // If something DOES NOT react, and hasn't been checked, we warn the user.
+            
+            for (let solidObj of state.solids) {
+                const solid = solidObj.id;
+                let reacted = false;
+
+                // --- LIQUID REACTIONS ---
+                if (liquid) {
+                    // 1. Alkali
+                    if (liquid === 'H2O' && chemType !== 'acid' && (solid === 'K' || solid === 'Na')) {
+                        processReaction(solid, 'ALKALI REACTION', { eq: `2${solid} + 2H₂O → 2${solid}OH + H₂`, why: `Violent reaction! Solution becomes Basic.` }, () => {
+                            spawnExplosion(150, 350); setLiquidColor('#6c5ce7'); state.chemType = 'base'; updateBadge('BASIC (pH 14)');
+                        }); reacted = true;
+                    }
+                    // 2. Amphoteric (Requires Base)
+                    else if (chemType === 'base' && (solid === 'Al' || solid === 'Zn')) {
+                         processReaction(solid, 'COMPLEX FORMATION', { eq: `2${solid} + 2OH⁻ + ... → [${solid}(OH)₄]⁻`, why: `${solid} dissolves in Base.` }, () => {
+                            createFumes(10, 'white');
+                        }); reacted = true;
+                    }
+                    // 3. Calcium
+                    else if (liquid === 'H2O' && solid === 'Ca') {
+                        processReaction(solid, 'DISSOLUTION', { eq: `Ca + 2H₂O → Ca(OH)₂ + H₂`, why: "Calcium reacts steadily." }, () => {
+                            setLiquidColor('rgba(255, 255, 255, 0.8)'); state.chemType = 'base'; updateBadge('BASIC (pH 10)'); createFumes(5, 'white');
+                        }); reacted = true;
+                    }
+                    // 4. Acid
+                    else if (chemType === 'acid' && ['Mg', 'Al', 'Zn', 'Fe', 'Na', 'K', 'Ca'].includes(solid)) {
+                        processReaction(solid, 'ACID DISPLACEMENT', { eq: `${solid} + 2H⁺ → ${solid}²⁺ + H₂`, why: "Metal dissolves in acid." }, () => {
+                            createFumes(8, 'white'); if (solid === 'Fe') setLiquidColor('#badc58');
+                        }); reacted = true;
+                    }
+                    // 5. Copper Specials
+                    else if (solid === 'Cu' && liquid === 'HNO3') {
+                        processReaction(solid, 'OXIDATION', { eq: `Cu + 4HNO₃ → ...`, why: "Copper dissolves in Nitric Acid." }, () => {
+                            setLiquidColor('#0984e3'); createFumes(25, 'orange');
+                        }); reacted = true;
+                    }
+                    else if (solid === 'Cu' && liquid === 'H2SO4' && temp > 80) {
+                        processReaction(solid, 'THERMAL OXIDATION', { eq: `Cu + 2H₂SO₄ → CuSO₄ + SO₂`, why: "Hot Acid oxidizes Copper." }, () => {
+                            setLiquidColor('#00a8ff'); createFumes(10, 'white');
+                        }); reacted = true;
+                    }
+                }
+
+                // --- DRY GAS REACTIONS ---
+                if (!liquid && !reacted) {
+                    if (gases.includes('O2') && solid === 'C' && temp > 100) {
+                        processReaction(solid, 'COMBUSTION', { eq: `C + O₂ → CO₂`, why: "Carbon burns in Oxygen." }, () => {
+                            spawnExplosion(150, 300); createFumes(20, 'gray');
+                        }); reacted = true;
+                    }
+                    else if (gases.includes('Cl2') && solid === 'Na' && temp > 50) {
+                        processReaction(solid, 'SYNTHESIS', { eq: `2Na + Cl₂ → 2NaCl`, why: "Sodium burns in Chlorine." }, () => {
+                            spawnExplosion(150, 300); createFumes(20, 'yellow');
+                        }); reacted = true;
+                    }
+                }
+
+                // --- NO REACTION LOGIC ---
+                // If it didn't react, and we haven't checked it yet...
+                if (!reacted && !solidObj.checked) {
+                    solidObj.checked = true; // Mark as checked so we don't spam
+                    
+                    if (solid === 'Au') showToast("Gold is inert (Noble Metal).");
+                    else if (solid === 'Cu' && liquid === 'H2O') showToast("Copper does not react with water.");
+                    else if (solid === 'Cu' && liquid === 'HCl') showToast("Copper is below Hydrogen in reactivity series.");
+                    else if (solid === 'Fe' && liquid === 'H2O') showToast("Iron rusts too slowly to see here.");
+                    else if (solid === 'C' && liquid) showToast("Carbon is generally insoluble.");
+                    else if (!liquid && gases.length === 0) showToast("Heating solid alone (Melting not simulated).");
+                    else if (liquid === 'H2O' && ['Mg', 'Al', 'Zn'].includes(solid)) showToast(`${elements.find(e=>e.id===solid).n} has an oxide layer.`);
+                    else showToast("No reaction detected.");
+                }
+
+                if (reacted) return; // Stop loop if reaction happened
+            }
+        }
+
+        function processReaction(solidID, title, data, visualFn) {
+            visualFn();
+            triggerReaction(title, data);
+            consumeSolid(solidID);
+            state.cooldown = true;
+            setTimeout(() => { state.cooldown = false; }, 2000);
+        }
+
+        function consumeSolid(id) {
+            const index = state.solids.findIndex(s => s.id === id);
+            if (index > -1) state.solids.splice(index, 1);
+            
+            const atoms = document.querySelectorAll(`.atom`);
+            for (let atom of atoms) {
+                if (atom.innerText.includes(id.replace(/\d/g,'')) && !atom.classList.contains('dissolving')) {
+                    atom.classList.add('dissolving'); 
+                    setTimeout(() => atom.remove(), 500);
+                    break;
                 }
             }
         }
 
-        // --- Reaction System ---
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            toast.classList.add('active');
+            setTimeout(() => toast.classList.remove('active'), 3000);
+        }
 
-        function scanBeaker() {
-            if(state.reacted) return;
-            const { liquid, solids, gases } = state;
-            const temp = tempState.current;
-            
-            // 1. Oxygen Combustion (Gas + Solid + Heat)
-            // No liquid required for this one
-            if (gases.includes('O2') && solids.includes('C')) {
-                if (temp > 100) {
-                    triggerReaction('COMBUSTION', {
-                        eq: `C + O₂ + Δ → CO₂`,
-                        why: "At high temperatures, Carbon reacts with Oxygen. This is a combustion reaction that produces Carbon Dioxide."
-                    });
-                    createBubbles(20); // Simulate smoke/gas
-                    // Visual flair: turn carbon atoms glowing red?
-                    return;
-                }
+        // --- UI & FX ---
+
+        function spawnExplosion(x, y) {
+            const container = document.getElementById('fx-layer');
+            const apparatus = document.getElementById('apparatus');
+            const flash = document.createElement('div');
+            flash.className = 'flash-overlay';
+            document.body.appendChild(flash);
+            setTimeout(() => flash.remove(), 300);
+
+            apparatus.classList.remove('shake');
+            void apparatus.offsetWidth; 
+            apparatus.classList.add('shake');
+
+            const colors = ['#ff0000', '#ffaa00', '#ffff00', '#333'];
+            for(let i=0; i<40; i++) {
+                const p = document.createElement('div');
+                p.className = 'ex-particle';
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 50 + Math.random() * 150;
+                p.style.left = (Math.random() * 200 + 50) + 'px';
+                p.style.top = '350px';
+                p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                p.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+                p.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
+                container.appendChild(p);
+                setTimeout(() => p.remove(), 800);
             }
+        }
 
-            if (liquid) {
-                // 2. Alkali Metals
-                if (solids.includes('K') || solids.includes('Na')) {
-                    const sym = solids.includes('K') ? 'K' : 'Na';
-                    triggerReaction('CRITICAL EXPLOSION', {
-                        eq: `2${sym} + 2H₂O → 2${sym}OH + H₂ + ΔH`,
-                        why: `Alkali metals react violently with water. The heat generated ignites the hydrogen instantly.`
-                    });
-                    setLiquidColor('#ff3300');
-                    createBubbles(20);
-                    return;
-                }
-
-                // 3. Calcium + Water
-                if (solids.includes('Ca') && liquid === 'H2O') {
-                    triggerReaction('EXOTHERMIC BUBBLING', { eq: `Ca + 2H₂O → Ca(OH)₂ + H₂`, why: "Calcium reacts steadily. Solution turns milky." });
-                    setLiquidColor('rgba(255, 255, 255, 0.6)');
-                    createBubbles(5);
-                    return;
-                }
-
-                // 4. Copper + Sulfuric Acid (HEAT REQUIRED)
-                if (solids.includes('Cu') && liquid === 'H2SO4') {
-                    if (temp > 80) {
-                        triggerReaction('THERMAL OXIDATION', {
-                            eq: `Cu + 2H₂SO₄ + Δ → CuSO₄ + SO₂ + 2H₂O`,
-                            why: "Copper is below hydrogen in reactivity series and won't react with cold acid. When heated, concentrated sulfuric acid acts as an oxidizer."
-                        });
-                        setLiquidColor('#00a8ff');
-                        createBubbles(10);
-                        return;
-                    }
-                }
-
-                // 5. Standard Acid Reactions
-                const activeMetals = ['Mg', 'Al', 'Zn', 'Fe'];
-                const addedMetal = solids.find(s => activeMetals.includes(s));
-                if (addedMetal && (liquid === 'HCl' || liquid === 'H2SO4' || liquid === 'HNO3')) {
-                    triggerReaction('ACID DISPLACEMENT', {
-                        eq: `${addedMetal} + 2H⁺ → ${addedMetal}²⁺ + H₂`,
-                        why: "Metal displaces hydrogen. Reaction is more vigorous at higher temperatures."
-                    });
-                    createBubbles(5);
-                    if(addedMetal === 'Fe') setLiquidColor('#a4b0be');
-                    return;
-                }
+        function createFumes(count, color) {
+            const container = document.getElementById('fx-layer');
+            const fumeColor = color === 'orange' ? '#e67e22' : (color === 'yellow' ? '#f1c40f' : (color === 'gray' ? '#636e72' : 'white'));
+            for(let i=0; i<count; i++) {
+                const b = document.createElement('div');
+                b.className = 'fume';
+                b.style.background = fumeColor;
+                b.style.left = Math.random()*250+'px';
+                b.style.top = '80%';
+                b.style.animationDelay = Math.random() * 0.5 + 's';
+                container.appendChild(b);
             }
         }
 
@@ -449,12 +586,17 @@
             liq.style.height = '60%';
             liq.style.background = color;
             liq.style.boxShadow = `0 0 30px ${color}`;
+            updateBadge(state.chemType === 'acid' ? 'ACIDIC' : 'NEUTRAL');
         }
 
         function setLiquidColor(color) {
             const liq = document.getElementById('liquid');
             liq.style.background = color;
             liq.style.boxShadow = `0 0 50px ${color}`;
+        }
+
+        function updateBadge(text) {
+            document.getElementById('chem-state-badge').innerText = text;
         }
 
         function spawnAtom(el) {
@@ -470,22 +612,7 @@
             container.appendChild(atom);
         }
 
-        function createBubbles(count) {
-            const container = document.getElementById('atoms');
-            for(let i=0; i<count; i++) {
-                const b = document.createElement('div');
-                b.className = 'atom';
-                b.style.width = '8px'; b.style.height = '8px';
-                b.style.background = 'rgba(255,255,255,0.6)';
-                b.style.left = Math.random()*250+'px';
-                b.style.top = '80%';
-                b.style.animation = `floatUp ${Math.random()*2 + 0.5}s infinite`;
-                container.appendChild(b);
-            }
-        }
-
         function triggerReaction(title, data) {
-            state.reacted = true;
             const panel = document.getElementById('analysis');
             panel.querySelector('h3').innerText = title;
             document.getElementById('eq-display').innerText = data.eq;
@@ -498,10 +625,11 @@
         }
 
         function resetVessel() {
-            state = { liquid: null, solids: [], gases: [], reacted: false };
+            state = { liquid: null, solids: [], gases: [], chemType: 'neutral', cooldown: false };
             document.getElementById('liquid').style.height = '0%';
             document.getElementById('atoms').innerHTML = '';
-            document.getElementById('fume-container').innerHTML = '';
+            document.getElementById('fx-layer').innerHTML = '';
+            updateBadge('NEUTRAL');
             closeAnalysis();
         }
     </script>
