@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Labs - Bunsen Burner Update</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-void: #090a0f;
+            --neon-blue: #00f3ff;
+            --neon-green: #0aff68;
+            --neon-warn: #ff3333;
+            --neon-orange: #ff9f43;
+            --glass: rgba(20, 30, 40, 0.9);
+            --border: 1px solid rgba(0, 243, 255, 0.2);
+        }
+        body {
+            margin: 0; font-family: 'Rajdhani', sans-serif;
+            background: var(--bg-void) radial-gradient(circle at 50% 50%, #1a202c 0%, #000 100%);
+            color: white; height: 100vh; overflow: hidden; display: flex; flex-direction: column;
+        }
+        header {
+            padding: 15px 30px; background: rgba(0,0,0,0.5); border-bottom: var(--border);
+            display: flex; justify-content: space-between; align-items: center; z-index: 10;
+        }
+        h1 { margin: 0; letter-spacing: 2px; }
+        
+        #element-strip {
+            padding: 15px 30px; display: flex; gap: 10px; overflow-x: auto;
+            background: rgba(255,255,255,0.02); border-bottom: var(--border);
+            min-height: 100px; z-index: 10;
+        }
+        
+        .element-card {
+            min-width: 70px; height: 80px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: grab; user-select: none; transition: 0.2s; position: relative;
+        }
+        .element-card:active { cursor: grabbing; transform: scale(0.95); }
+        .element-card:hover { border-color: var(--neon-blue); background: rgba(0, 243, 255, 0.1); }
+        .element-card.dragging { opacity: 0.5; border: 1px dashed var(--neon-blue); }
+
+        .t-liquid { border-bottom: 3px solid var(--neon-blue); }
+        .t-acid { border-bottom: 3px solid #ff9f43; }
+        .t-solid { border-bottom: 3px solid #f1c40f; }
+        .t-gas { border-bottom: 3px solid #bd10e0; }
+        
+        .el-sym { font-size: 1.6rem; font-weight: 700; }
+        .el-name { font-size: 0.7rem; font-family: 'JetBrains Mono'; margin-top: 4px; opacity: 0.7; }
+
+        .main-stage { flex: 1; display: flex; position: relative; justify-content: center; align-items: center; flex-direction: column; }
+        
+        /* VESSEL & APPARATUS */
+        .apparatus-cluster {
+            position: relative;
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        .vessel {
+            width: 300px; height: 400px; border: 2px solid rgba(255,255,255,0.15); border-top: none;
+            border-radius: 0 0 50px 50px; position: relative; overflow: hidden;
+            background: linear-gradient(to right, rgba(255,255,255,0.02), transparent);
+            box-shadow: inset 0 -20px 30px rgba(0,0,0,0.5);
+            transition: all 0.3s ease;
+            z-index: 2;
+        }
+
+        .vessel.drag-active {
+            border-color: var(--neon-green);
+            box-shadow: 0 0 30px rgba(10, 255, 104, 0.3);
+        }
+
+        /* THERMOMETER */
+        .thermometer-wrapper {
+            position: absolute; left: -60px; bottom: 50px; height: 300px; width: 40px;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .thermometer-glass {
+            width: 12px; height: 100%; background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3); border-radius: 10px;
+            position: relative; overflow: hidden;
+        }
+        .thermometer-mercury {
+            position: absolute; bottom: 0; width: 100%; height: 25%; /* Start at room temp */
+            background: linear-gradient(to top, #ff3333, #ff9f43);
+            transition: height 0.5s ease;
+        }
+        .thermometer-bulb {
+            width: 24px; height: 24px; border-radius: 50%; background: #ff3333;
+            margin-top: -5px; z-index: 2; border: 1px solid rgba(255,255,255,0.3);
+        }
+        .temp-readout {
+            font-family: 'JetBrains Mono'; color: white; font-size: 0.9rem; margin-top: 10px;
+            background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 4px;
+        }
+
+        /* HEATER */
+        .heater-base {
+            width: 200px; height: 40px; background: #2d3436;
+            border-radius: 5px; margin-top: 20px;
+            display: flex; align-items: center; justify-content: center;
+            border-top: 4px solid #636e72;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .burner-grill {
+            width: 100%; position: absolute; top: -15px; height: 15px;
+            display: flex; justify-content: center; gap: 5px;
+        }
+        .grill-bar { width: 4px; height: 100%; background: #636e72; }
+
+        .flame-container {
+            position: absolute; top: -50px; width: 100%; display: flex; justify-content: center;
+            opacity: 0; transition: opacity 0.5s; pointer-events: none;
+        }
+        .flame-container.active { opacity: 1; }
+        
+        .flame {
+            width: 60px; height: 60px; background: radial-gradient(circle, #ff9f43 0%, transparent 70%);
+            filter: blur(10px); animation: flicker 0.1s infinite alternate;
+            border-radius: 50%;
+        }
+        @keyframes flicker { from { transform: scale(1); opacity: 0.8; } to { transform: scale(1.1); opacity: 1; } }
+
+        /* HEAT CONTROL UI */
+        .control-panel {
+            margin-top: 20px; display: flex; gap: 20px; align-items: center;
+        }
+        .switch {
+            position: relative; display: inline-block; width: 60px; height: 34px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc; transition: .4s; border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px;
+            background-color: white; transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--neon-warn); box-shadow: 0 0 15px var(--neon-warn); }
+        input:checked + .slider:before { transform: translateX(26px); }
+
+        /* LIQUIDS & ATOMS */
+        .liquid {
+            position: absolute; bottom: 0; width: 100%; height: 0%;
+            background: rgba(0, 243, 255, 0.3);
+            transition: height 0.8s ease-out, background 1s ease;
+            box-shadow: 0 0 40px var(--neon-blue);
+        }
+        
+        .atom-container { position: absolute; inset: 0; pointer-events: none; }
+        .atom {
+            width: 32px; height: 32px; border-radius: 50%; position: absolute; left: 50%;
+            display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.8rem;
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+            animation: fallIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            z-index: 10;
+        }
+        @keyframes fallIn { from { top: -50px; } to { top: 85%; } }
+        
+        /* Atom Variants */
+        .atom.gas { background: rgba(255,255,255,0.1); border: 2px solid #bd10e0; color: #bd10e0; animation: floatUp 4s infinite linear; }
+        .atom.gas-green { background: rgba(106, 176, 76, 0.2); border: 2px solid #6ab04c; color: #badc58; animation: floatUp 4s infinite linear; }
+        .atom.gas-blue { background: rgba(52, 152, 219,0.2); border: 2px solid #3498db; color: #3498db; animation: floatUp 4s infinite linear; }
+        .atom.metal { background: #e2e8f0; color: #1e293b; border: 1px solid #94a3b8; }
+        .atom.gold { background: #facc15; border: 1px solid #eab308; color: #000; }
+        .atom.copper { background: #f97316; border: 1px solid #c2410c; }
+        .atom.sulfur { background: #fef08a; color: #854d0e; border: 1px solid #facc15; }
+        .atom.iron { background: #576574; color: white; border: 1px solid #222f3e; }
+        .atom.carbon { background: #2d3436; color: #dfe6e9; border: 1px solid #000; }
+        .atom.iodine { background: #4834d4; color: #be2edd; border: 1px solid #686de0; }
+
+        @keyframes floatUp { 0% { top: 90%; opacity: 0; } 20% { opacity: 1; } 100% { top: -20px; opacity: 0; } }
+
+        .analysis-panel {
+            position: absolute; right: 20px; top: 100px; width: 350px;
+            background: var(--glass); border: 1px solid rgba(0, 243, 255, 0.3);
+            border-radius: 12px; padding: 20px; backdrop-filter: blur(10px);
+            opacity: 0; pointer-events: none; transform: translateY(20px); transition: 0.3s;
+            z-index: 100;
+        }
+        .analysis-panel.active { opacity: 1; pointer-events: auto; transform: translateY(0); }
+        
+        .chem-eq { 
+            background: rgba(0,0,0,0.4); padding: 10px; border-radius: 6px; 
+            font-family: 'JetBrains Mono'; color: var(--neon-green); margin: 10px 0; border: 1px solid rgba(10, 255, 104, 0.3);
+        }
+        .explanation { font-size: 0.9rem; line-height: 1.5; color: #cbd5e1; }
+        
+        .btn {
+            background: transparent; border: 1px solid var(--neon-warn); color: var(--neon-warn);
+            padding: 8px 16px; cursor: pointer; font-family: 'Rajdhani'; font-weight: bold;
+            transition: 0.2s;
+        }
+        .btn:hover { background: var(--neon-warn); color: white; }
+
+        #fume-container { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+        .fume {
+            position: absolute; width: 60px; height: 60px; background: orange;
+            border-radius: 50%; opacity: 0.6; filter: blur(20px);
+            animation: riseFume 3s forwards;
+        }
+        @keyframes riseFume { to { transform: translateY(-300px) scale(2); opacity: 0; } }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>⚛️ QUANTUM LAB <span style="color:var(--neon-blue); font-size:0.8rem">v3.1</span></h1>
+        <div style="font-family: 'JetBrains Mono'; color: rgba(255,255,255,0.5); font-size: 0.8rem;">
+            <span id="el-count">0</span> ELEMENTS LOADED
+        </div>
+        <button class="btn" onclick="resetVessel()">FLUSH SYSTEM</button>
+    </header>
+
+    <div id="element-strip"></div>
+
+    <div class="main-stage">
+        
+        <div class="apparatus-cluster">
+            <div class="vessel" id="drop-zone">
+                <div class="liquid" id="liquid"></div>
+                <div id="fume-container"></div>
+                <div class="atom-container" id="atoms"></div>
+
+                <div class="thermometer-wrapper">
+                    <div class="thermometer-glass">
+                        <div class="thermometer-mercury" id="mercury"></div>
+                    </div>
+                    <div class="thermometer-bulb"></div>
+                    <div class="temp-readout" id="temp-display">25°C</div>
+                </div>
+            </div>
+
+            <div class="heater-base">
+                <div class="burner-grill">
+                    <div class="grill-bar"></div><div class="grill-bar"></div><div class="grill-bar"></div>
+                </div>
+                <div class="flame-container" id="flame-effect">
+                    <div class="flame"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <label style="font-weight:bold; letter-spacing:1px;">BUNSEN BURNER</label>
+            <label class="switch">
+                <input type="checkbox" id="heater-toggle" onchange="toggleHeater()">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="analysis-panel" id="analysis">
+            <h3 style="margin:0 0 10px 0; color:white;">REACTION DETECTED</h3>
+            <div class="chem-eq" id="eq-display"></div>
+            <div class="explanation" id="why-display"></div>
+            <button onclick="closeAnalysis()" style="margin-top:15px; background:rgba(255,255,255,0.1); border:none; color:white; padding:5px 10px; cursor:pointer;">Close</button>
+        </div>
+    </div>
+
+    <script>
+        const elements = [
+            { id: 'H2O', n: 'Water', t: 'liquid', color: 'rgba(0, 243, 255, 0.4)' },
+            { id: 'HCl', n: 'Hydrochloric Acid', t: 'acid', color: 'rgba(255, 255, 150, 0.4)' },
+            { id: 'HNO3', n: 'Nitric Acid', t: 'acid', color: 'rgba(255, 255, 255, 0.3)' },
+            { id: 'H2SO4', n: 'Sulfuric Acid', t: 'acid', color: 'rgba(255, 100, 0, 0.3)' },
+            { id: 'Na', n: 'Sodium', t: 'solid', class: 'metal' },
+            { id: 'K',  n: 'Potassium', t: 'solid', class: 'metal' },
+            { id: 'Mg', n: 'Magnesium', t: 'solid', class: 'metal' },
+            { id: 'Ca', n: 'Calcium', t: 'solid', class: 'metal' },
+            { id: 'Al', n: 'Aluminum', t: 'solid', class: 'metal' },
+            { id: 'Fe', n: 'Iron', t: 'solid', class: 'iron' },
+            { id: 'Zn', n: 'Zinc', t: 'solid', class: 'metal' },
+            { id: 'Cu', n: 'Copper', t: 'solid', class: 'copper' },
+            { id: 'Au', n: 'Gold', t: 'solid', class: 'gold' },
+            { id: 'C',  n: 'Carbon', t: 'solid', class: 'carbon' },
+            { id: 'Cl2', n: 'Chlorine', t: 'gas', class: 'gas-green' },
+            { id: 'O2', n: 'Oxygen', t: 'gas', class: 'gas-blue' } // NEW ELEMENT
+        ];
+
+        // Update the counter in the header
+        document.getElementById('el-count').innerText = elements.length;
+
+        let state = { liquid: null, solids: [], gases: [], reacted: false };
+        let tempState = { current: 25, target: 25, heating: false };
+
+        // --- Drag & Drop Setup ---
+        const strip = document.getElementById('element-strip');
+        elements.forEach(el => {
+            const div = document.createElement('div');
+            div.className = `element-card t-${el.t}`;
+            div.setAttribute('draggable', true);
+            div.innerHTML = `<span class="el-sym">${el.id.replace(/\d/g, sub => `<sub>${sub}</sub>`)}</span><span class="el-name">${el.n}</span>`;
+            div.onclick = () => addElement(el);
+            div.addEventListener('dragstart', (e) => {
+                div.classList.add('dragging');
+                e.dataTransfer.setData('application/json', JSON.stringify(el));
+            });
+            div.addEventListener('dragend', () => div.classList.remove('dragging'));
+            strip.appendChild(div);
+        });
+
+        const dropZone = document.getElementById('drop-zone');
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-active'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-active'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault(); dropZone.classList.remove('drag-active');
+            try { addElement(JSON.parse(e.dataTransfer.getData('application/json'))); } catch (err) {}
+        });
+
+        // --- Core Logic ---
+
+        function addElement(el) {
+            state.reacted = false;
+            if (['liquid', 'acid'].includes(el.t)) {
+                if (state.liquid && state.liquid !== el.id) {
+                    alert("Please flush the vessel before mixing different liquids."); 
+                    return;
+                }
+                state.liquid = el.id;
+                updateLiquidVisuals(el.color);
+            } else if (el.t === 'gas') {
+                state.gases.push(el.id);
+                spawnAtom(el);
+            } else {
+                state.solids.push(el.id);
+                spawnAtom(el);
+            }
+            scanBeaker(); // Initial check on drop
+        }
+
+        // --- Heat Logic ---
+
+        function toggleHeater() {
+            tempState.heating = document.getElementById('heater-toggle').checked;
+            document.getElementById('flame-effect').classList.toggle('active', tempState.heating);
+            tempState.target = tempState.heating ? 250 : 25; // Heat up to 250C to allow combustion
+        }
+
+        setInterval(() => {
+            if (Math.abs(tempState.current - tempState.target) > 0.5) {
+                const speed = tempState.heating ? 1.0 : 0.5; 
+                tempState.current += (tempState.target > tempState.current) ? speed : -speed;
+                updateThermometer();
+                scanBeaker();
+            }
+        }, 50);
+
+        function updateThermometer() {
+            const display = document.getElementById('temp-display');
+            const mercury = document.getElementById('mercury');
+            
+            // Map 0-250C to 0-100% height
+            let heightPerc = (tempState.current / 250) * 100;
+            if(heightPerc < 5) heightPerc = 5;
+            if(heightPerc > 100) heightPerc = 100;
+
+            display.innerText = Math.round(tempState.current) + '°C';
+            mercury.style.height = heightPerc + '%';
+
+            const liq = document.getElementById('liquid');
+            if(state.liquid) {
+                if(tempState.current > 90) {
+                    if(Math.random() > 0.7) createBubbles(1);
+                    display.style.color = '#ff3333';
+                } else {
+                    display.style.color = 'white';
+                }
+            }
+        }
+
+        // --- Reaction System ---
+
+        function scanBeaker() {
+            if(state.reacted) return;
+            const { liquid, solids, gases } = state;
+            const temp = tempState.current;
+            
+            // 1. Oxygen Combustion (Gas + Solid + Heat)
+            // No liquid required for this one
+            if (gases.includes('O2') && solids.includes('C')) {
+                if (temp > 100) {
+                    triggerReaction('COMBUSTION', {
+                        eq: `C + O₂ + Δ → CO₂`,
+                        why: "At high temperatures, Carbon reacts with Oxygen. This is a combustion reaction that produces Carbon Dioxide."
+                    });
+                    createBubbles(20); // Simulate smoke/gas
+                    // Visual flair: turn carbon atoms glowing red?
+                    return;
+                }
+            }
+
+            if (liquid) {
+                // 2. Alkali Metals
+                if (solids.includes('K') || solids.includes('Na')) {
+                    const sym = solids.includes('K') ? 'K' : 'Na';
+                    triggerReaction('CRITICAL EXPLOSION', {
+                        eq: `2${sym} + 2H₂O → 2${sym}OH + H₂ + ΔH`,
+                        why: `Alkali metals react violently with water. The heat generated ignites the hydrogen instantly.`
+                    });
+                    setLiquidColor('#ff3300');
+                    createBubbles(20);
+                    return;
+                }
+
+                // 3. Calcium + Water
+                if (solids.includes('Ca') && liquid === 'H2O') {
+                    triggerReaction('EXOTHERMIC BUBBLING', { eq: `Ca + 2H₂O → Ca(OH)₂ + H₂`, why: "Calcium reacts steadily. Solution turns milky." });
+                    setLiquidColor('rgba(255, 255, 255, 0.6)');
+                    createBubbles(5);
+                    return;
+                }
+
+                // 4. Copper + Sulfuric Acid (HEAT REQUIRED)
+                if (solids.includes('Cu') && liquid === 'H2SO4') {
+                    if (temp > 80) {
+                        triggerReaction('THERMAL OXIDATION', {
+                            eq: `Cu + 2H₂SO₄ + Δ → CuSO₄ + SO₂ + 2H₂O`,
+                            why: "Copper is below hydrogen in reactivity series and won't react with cold acid. When heated, concentrated sulfuric acid acts as an oxidizer."
+                        });
+                        setLiquidColor('#00a8ff');
+                        createBubbles(10);
+                        return;
+                    }
+                }
+
+                // 5. Standard Acid Reactions
+                const activeMetals = ['Mg', 'Al', 'Zn', 'Fe'];
+                const addedMetal = solids.find(s => activeMetals.includes(s));
+                if (addedMetal && (liquid === 'HCl' || liquid === 'H2SO4' || liquid === 'HNO3')) {
+                    triggerReaction('ACID DISPLACEMENT', {
+                        eq: `${addedMetal} + 2H⁺ → ${addedMetal}²⁺ + H₂`,
+                        why: "Metal displaces hydrogen. Reaction is more vigorous at higher temperatures."
+                    });
+                    createBubbles(5);
+                    if(addedMetal === 'Fe') setLiquidColor('#a4b0be');
+                    return;
+                }
+            }
+        }
+
+        function updateLiquidVisuals(color) {
+            const liq = document.getElementById('liquid');
+            liq.style.height = '60%';
+            liq.style.background = color;
+            liq.style.boxShadow = `0 0 30px ${color}`;
+        }
+
+        function setLiquidColor(color) {
+            const liq = document.getElementById('liquid');
+            liq.style.background = color;
+            liq.style.boxShadow = `0 0 50px ${color}`;
+        }
+
+        function spawnAtom(el) {
+            const container = document.getElementById('atoms');
+            const atom = document.createElement('div');
+            atom.className = `atom ${el.class || ''}`;
+            atom.innerHTML = el.id.replace(/\d/g, '');
+            atom.style.left = (Math.random() * 240 + 30) + 'px';
+            if (el.t === 'gas') {
+                atom.style.top = '80%';
+                atom.style.animation = 'floatUp 3s infinite linear';
+            }
+            container.appendChild(atom);
+        }
+
+        function createBubbles(count) {
+            const container = document.getElementById('atoms');
+            for(let i=0; i<count; i++) {
+                const b = document.createElement('div');
+                b.className = 'atom';
+                b.style.width = '8px'; b.style.height = '8px';
+                b.style.background = 'rgba(255,255,255,0.6)';
+                b.style.left = Math.random()*250+'px';
+                b.style.top = '80%';
+                b.style.animation = `floatUp ${Math.random()*2 + 0.5}s infinite`;
+                container.appendChild(b);
+            }
+        }
+
+        function triggerReaction(title, data) {
+            state.reacted = true;
+            const panel = document.getElementById('analysis');
+            panel.querySelector('h3').innerText = title;
+            document.getElementById('eq-display').innerText = data.eq;
+            document.getElementById('why-display').innerText = data.why;
+            panel.classList.add('active');
+        }
+
+        function closeAnalysis() {
+            document.getElementById('analysis').classList.remove('active');
+        }
+
+        function resetVessel() {
+            state = { liquid: null, solids: [], gases: [], reacted: false };
+            document.getElementById('liquid').style.height = '0%';
+            document.getElementById('atoms').innerHTML = '';
+            document.getElementById('fume-container').innerHTML = '';
+            closeAnalysis();
+        }
+    </script>
+</body>
+</html>
