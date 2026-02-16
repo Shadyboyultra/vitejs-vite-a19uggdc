@@ -3,635 +3,696 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quantum Labs - Smart Analysis</title>
-    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <title>Quantum Labs v9.0 - Omnichrom Simulation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     
     <style>
+        /* --- CORE VISUALS & RESET --- */
         :root {
-            --bg-void: #090a0f;
+            --void: #05070a;
+            --glass: rgba(20, 30, 40, 0.6);
+            --border: 1px solid rgba(255, 255, 255, 0.1);
             --neon-blue: #00f3ff;
+            --neon-purple: #bc13fe;
             --neon-green: #0aff68;
             --neon-warn: #ff3333;
-            --neon-purple: #d63031;
-            --glass: rgba(20, 30, 40, 0.9);
-            --border: 1px solid rgba(0, 243, 255, 0.2);
+            --text-main: #e2e8f0;
         }
+
+        * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
+        
         body {
-            margin: 0; font-family: 'Rajdhani', sans-serif;
-            background: var(--bg-void) radial-gradient(circle at 50% 50%, #1a202c 0%, #000 100%);
-            color: white; height: 100vh; overflow: hidden; display: flex; flex-direction: column;
+            margin: 0; padding: 0;
+            background: radial-gradient(circle at 50% -20%, #1a202c 0%, var(--void) 100%);
+            color: var(--text-main);
+            font-family: 'Rajdhani', sans-serif;
+            height: 100vh; overflow: hidden;
+            display: flex; flex-direction: column;
         }
-        header {
-            padding: 15px 30px; background: rgba(0,0,0,0.5); border-bottom: var(--border);
-            display: flex; justify-content: space-between; align-items: center; z-index: 10;
+
+        /* --- AUTH SYSTEM CSS --- */
+        #auth-overlay {
+            position: fixed; inset: 0; background: #000; z-index: 10000;
+            display: flex; justify-content: center; align-items: center;
+            transition: transform 0.8s cubic-bezier(0.8, 0, 0.2, 1);
         }
-        h1 { margin: 0; letter-spacing: 2px; }
+        #auth-overlay.hidden { transform: translateY(-100%); pointer-events: none; }
         
-        #element-strip {
-            padding: 15px 30px; display: flex; gap: 10px; overflow-x: auto;
-            background: rgba(255,255,255,0.02); border-bottom: var(--border);
-            min-height: 100px; z-index: 10;
-        }
-        
-        /* --- ORBITAL HOVER EFFECTS --- */
-        .element-card {
-            min-width: 70px; height: 80px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            cursor: grab; user-select: none; transition: 0.2s; position: relative; overflow: visible;
-        }
-        .element-card:active { cursor: grabbing; transform: scale(0.95); }
-        .element-card:hover { border-color: var(--neon-blue); background: rgba(0, 243, 255, 0.1); z-index: 10; }
-        .element-card.dragging { opacity: 0.5; border: 1px dashed var(--neon-blue); }
-
-        /* The Ring */
-        .orbit-ring {
-            position: absolute; width: 90px; height: 90px; border-radius: 50%;
-            border: 1px solid rgba(0, 243, 255, 0.1);
-            opacity: 0; transition: opacity 0.3s; pointer-events: none;
-            animation: spin 3s linear infinite;
-        }
-        .element-card:hover .orbit-ring { opacity: 1; border-color: rgba(0, 243, 255, 0.4); }
-
-        /* The Electron Dots */
-        .electron {
-            position: absolute; top: -4px; left: 50%; width: 6px; height: 6px;
-            background: var(--neon-blue); border-radius: 50%;
-            box-shadow: 0 0 8px var(--neon-blue);
-            transform: translateX(-50%);
-        }
-        .electron:nth-child(2) { top: auto; bottom: -4px; }
-
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        .t-liquid { border-bottom: 3px solid var(--neon-blue); }
-        .t-acid { border-bottom: 3px solid #ff9f43; }
-        .t-solid { border-bottom: 3px solid #f1c40f; }
-        .t-gas { border-bottom: 3px solid #bd10e0; }
-        
-        .el-sym { font-size: 1.6rem; font-weight: 700; position: relative; z-index: 2; }
-        .el-name { font-size: 0.7rem; font-family: 'JetBrains Mono'; margin-top: 4px; opacity: 0.7; z-index: 2; }
-
-        .main-stage { flex: 1; display: flex; position: relative; justify-content: center; align-items: center; flex-direction: column; }
-        
-        .apparatus-cluster {
-            position: relative;
-            display: flex; flex-direction: column; align-items: center;
-            transition: transform 0.1s;
-        }
-        .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
-        @keyframes shake { 
-            10%, 90% { transform: translate3d(-1px, 0, 0); }
-            20%, 80% { transform: translate3d(2px, 0, 0); }
-            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-            40%, 60% { transform: translate3d(4px, 0, 0); }
-        }
-
-        .vessel {
-            width: 300px; height: 400px; border: 2px solid rgba(255,255,255,0.15); border-top: none;
-            border-radius: 0 0 50px 50px; position: relative; overflow: hidden;
-            background: linear-gradient(to right, rgba(255,255,255,0.02), transparent);
-            box-shadow: inset 0 -20px 30px rgba(0,0,0,0.5);
-            transition: all 0.3s ease;
-            z-index: 2;
-        }
-
-        .thermometer-wrapper {
-            position: absolute; left: -60px; bottom: 50px; height: 300px; width: 40px;
-            display: flex; flex-direction: column; align-items: center;
-        }
-        .thermometer-glass {
-            width: 12px; height: 100%; background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.3); border-radius: 10px;
+        .auth-container {
+            width: 400px; padding: 40px;
+            background: rgba(10, 15, 20, 0.95);
+            border: 1px solid #333;
+            box-shadow: 0 0 50px rgba(0, 243, 255, 0.1);
             position: relative; overflow: hidden;
         }
-        .thermometer-mercury {
-            position: absolute; bottom: 0; width: 100%; height: 25%;
-            background: linear-gradient(to top, #ff3333, #ff9f43);
-            transition: height 0.5s ease;
+        .auth-container::after {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--neon-blue), transparent);
+            animation: scanline 2s linear infinite;
         }
-        .thermometer-bulb {
-            width: 24px; height: 24px; border-radius: 50%; background: #ff3333;
-            margin-top: -5px; z-index: 2; border: 1px solid rgba(255,255,255,0.3);
-        }
-        .temp-readout {
-            font-family: 'JetBrains Mono'; color: white; font-size: 0.9rem; margin-top: 10px;
-            background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 4px;
-        }
+        @keyframes scanline { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 
-        .heater-base {
-            width: 200px; height: 40px; background: #2d3436;
-            border-radius: 5px; margin-top: 20px;
-            display: flex; align-items: center; justify-content: center;
-            border-top: 4px solid #636e72;
-            position: relative;
-            z-index: 1;
+        .input-group { position: relative; margin-bottom: 20px; }
+        .input-field {
+            width: 100%; background: #0a0a0a; border: 1px solid #333;
+            padding: 15px; color: var(--neon-blue); font-family: 'JetBrains Mono';
+            font-size: 1rem; transition: 0.3s;
         }
+        .input-field:focus { border-color: var(--neon-blue); box-shadow: 0 0 15px rgba(0,243,255,0.1); }
         
-        .burner-grill {
-            width: 100%; position: absolute; top: -15px; height: 15px;
-            display: flex; justify-content: center; gap: 5px;
+        .btn-auth {
+            width: 100%; padding: 15px; background: var(--neon-blue); color: #000;
+            border: none; font-weight: 700; font-size: 1.1rem; letter-spacing: 2px;
+            cursor: pointer; transition: 0.2s; text-transform: uppercase;
         }
-        .grill-bar { width: 4px; height: 100%; background: #636e72; }
+        .btn-auth:hover { background: white; box-shadow: 0 0 20px var(--neon-blue); }
+        .auth-msg { color: var(--neon-warn); font-size: 0.8rem; height: 20px; margin-bottom: 10px; font-family: 'JetBrains Mono'; }
 
-        .flame-container {
-            position: absolute; top: -50px; width: 100%; display: flex; justify-content: center;
-            opacity: 0; transition: opacity 0.5s; pointer-events: none;
-        }
-        .flame-container.active { opacity: 1; }
-        
-        .flame {
-            width: 60px; height: 60px; background: radial-gradient(circle, #ff9f43 0%, transparent 70%);
-            filter: blur(10px); animation: flicker 0.1s infinite alternate;
-            border-radius: 50%;
-        }
-        @keyframes flicker { from { transform: scale(1); opacity: 0.8; } to { transform: scale(1.1); opacity: 1; } }
-
-        .liquid {
-            position: absolute; bottom: 0; width: 100%; height: 0%;
-            background: rgba(0, 243, 255, 0.3);
-            transition: height 0.8s ease-out, background 1s ease;
-            box-shadow: 0 0 40px var(--neon-blue);
-        }
-        
-        .atom-container { position: absolute; inset: 0; pointer-events: none; }
-        .atom {
-            width: 32px; height: 32px; border-radius: 50%; position: absolute; left: 50%;
-            display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.8rem;
-            box-shadow: 0 0 10px rgba(255,255,255,0.5);
-            animation: fallIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-            transition: opacity 0.5s, transform 0.5s;
-            z-index: 10;
-        }
-        .atom.dissolving { opacity: 0; transform: scale(0); }
-        @keyframes fallIn { from { top: -50px; } to { top: 85%; } }
-        
-        .atom.gas { background: rgba(255,255,255,0.1); border: 2px solid #bd10e0; color: #bd10e0; animation: floatUp 4s infinite linear; }
-        .atom.gas-green { background: rgba(106, 176, 76, 0.2); border: 2px solid #6ab04c; color: #badc58; animation: floatUp 4s infinite linear; }
-        .atom.gas-blue { background: rgba(52, 152, 219,0.2); border: 2px solid #3498db; color: #3498db; animation: floatUp 4s infinite linear; }
-        .atom.metal { background: #e2e8f0; color: #1e293b; border: 1px solid #94a3b8; }
-        .atom.gold { background: #facc15; border: 1px solid #eab308; color: #000; }
-        .atom.copper { background: #f97316; border: 1px solid #c2410c; }
-        .atom.iron { background: #576574; color: white; border: 1px solid #222f3e; }
-        .atom.carbon { background: #2d3436; color: #dfe6e9; border: 1px solid #000; }
-
-        @keyframes floatUp { 0% { top: 90%; opacity: 0; } 20% { opacity: 1; } 100% { top: -20px; opacity: 0; } }
-
-        .control-panel { margin-top: 20px; display: flex; gap: 20px; align-items: center; }
-        .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
-        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: var(--neon-warn); box-shadow: 0 0 15px var(--neon-warn); }
-        input:checked + .slider:before { transform: translateX(26px); }
-
-        .analysis-panel {
-            position: absolute; right: 20px; top: 100px; width: 350px;
-            background: var(--glass); border: 1px solid rgba(0, 243, 255, 0.3);
-            border-radius: 12px; padding: 20px; backdrop-filter: blur(10px);
-            opacity: 0; pointer-events: none; transform: translateY(20px); transition: 0.3s;
+        /* --- MAIN UI LAYOUT --- */
+        header {
+            height: 70px; border-bottom: var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 30px; background: rgba(0,0,0,0.3); backdrop-filter: blur(10px);
             z-index: 100;
         }
-        .analysis-panel.active { opacity: 1; pointer-events: auto; transform: translateY(0); }
-        .chem-eq { background: rgba(0,0,0,0.4); padding: 10px; border-radius: 6px; font-family: 'JetBrains Mono'; color: var(--neon-green); margin: 10px 0; border: 1px solid rgba(10, 255, 104, 0.3); }
-        .explanation { font-size: 0.9rem; line-height: 1.5; color: #cbd5e1; }
-        .status-badge { display:inline-block; padding:2px 6px; border-radius:4px; background:#e17055; font-size:0.7rem; margin-bottom:5px; font-weight:bold;}
-        .btn { background: transparent; border: 1px solid var(--neon-warn); color: var(--neon-warn); padding: 8px 16px; cursor: pointer; font-family: 'Rajdhani'; font-weight: bold; transition: 0.2s; }
-        .btn:hover { background: var(--neon-warn); color: white; }
-
-        /* Notification Toast */
-        .toast {
-            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-            background: rgba(30, 40, 50, 0.9); border: 1px solid rgba(255,255,255,0.2);
-            padding: 10px 20px; border-radius: 8px; font-family: 'JetBrains Mono'; font-size: 0.8rem;
-            color: white; pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 2000;
-            display: flex; align-items: center; gap: 10px;
-        }
-        .toast.active { opacity: 1; }
-        .toast-icon { font-size: 1.2rem; }
-
-        #fx-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 50; }
         
-        .fume {
-            position: absolute; width: 60px; height: 60px; border-radius: 50%; 
-            opacity: 0.6; filter: blur(20px); animation: riseFume 3s forwards;
+        .brand { font-size: 1.5rem; font-weight: 700; letter-spacing: 2px; display: flex; align-items: center; gap: 10px; }
+        .brand span { color: var(--neon-blue); font-size: 0.8em; opacity: 0.8; }
+        
+        .user-panel { display: flex; gap: 15px; align-items: center; }
+        .btn-small {
+            background: transparent; border: 1px solid rgba(255,255,255,0.2);
+            color: #aaa; padding: 6px 12px; font-family: 'JetBrains Mono';
+            cursor: pointer; font-size: 0.8rem; transition: 0.2s;
         }
-        @keyframes riseFume { to { transform: translateY(-300px) scale(2); opacity: 0; } }
+        .btn-small:hover { border-color: var(--neon-blue); color: white; }
+        .btn-logout { border-color: rgba(255, 50, 50, 0.3); color: #ff6b6b; }
+        .btn-logout:hover { background: var(--neon-warn); color: white; border-color: var(--neon-warn); }
 
-        .ex-particle {
-            position: absolute; width: 10px; height: 10px; border-radius: 50%;
-            animation: explode 0.8s ease-out forwards;
+        /* --- ELEMENT SCROLL STRIP (16 ITEMS) --- */
+        #element-dock {
+            height: 110px; border-bottom: var(--border);
+            background: rgba(0,0,0,0.2);
+            display: flex; align-items: center; overflow-x: auto;
+            padding: 0 20px; gap: 12px;
+            scrollbar-width: thin; scrollbar-color: var(--neon-blue) #111;
         }
-        @keyframes explode {
-            0% { transform: translate(0,0) scale(1); opacity: 1; }
-            100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
+        #element-dock::-webkit-scrollbar { height: 4px; }
+        #element-dock::-webkit-scrollbar-thumb { background: var(--neon-blue); }
+
+        .element-card {
+            flex: 0 0 80px; height: 80px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+            border: 1px solid rgba(255,255,255,0.08);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.2s ease;
+            position: relative; user-select: none;
+        }
+        .element-card:hover { transform: translateY(-3px); border-color: var(--neon-blue); background: rgba(0,243,255,0.05); }
+        .element-card:active { transform: scale(0.95); }
+        
+        .el-symbol { font-size: 1.8rem; font-weight: 700; color: #fff; z-index: 2; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .el-name { font-size: 0.65rem; color: #888; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
+        .el-tag { 
+            position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%;
         }
 
-        .flash-overlay {
-            position: fixed; inset: 0; background: white; pointer-events: none; z-index: 999;
-            animation: flashAnim 0.3s ease-out forwards;
+        /* --- STAGE & APPARATUS --- */
+        .stage {
+            flex: 1; display: flex; position: relative;
+            justify-content: center; align-items: center;
+            perspective: 1000px; overflow: hidden;
         }
-        @keyframes flashAnim { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+        /* The Beaker Assembly */
+        .apparatus {
+            position: relative; width: 320px; height: 450px;
+            display: flex; flex-direction: column; align-items: center;
+            z-index: 10;
+        }
+
+        .beaker-glass {
+            width: 100%; height: 380px;
+            background: linear-gradient(to right, rgba(255,255,255,0.05), rgba(255,255,255,0.01) 40%, rgba(255,255,255,0.01) 60%, rgba(255,255,255,0.05));
+            border: 2px solid rgba(255,255,255,0.2); border-top: none;
+            border-radius: 0 0 40px 40px;
+            position: relative; overflow: hidden;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.3);
+            backdrop-filter: blur(2px);
+        }
+
+        /* Canvas for High-Performance Fluid Simulation */
+        #sim-canvas {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            opacity: 0.9;
+        }
+
+        /* Heater Plate */
+        .heater {
+            width: 240px; height: 50px; background: #2d3436;
+            border-radius: 8px; margin-top: 15px;
+            border-top: 4px solid #444;
+            position: relative; display: flex; justify-content: center;
+        }
+        .heater.active { border-top-color: var(--neon-warn); box-shadow: 0 -10px 30px rgba(255, 50, 50, 0.2); }
+        
+        .coil-glow {
+            position: absolute; top: -10px; width: 80%; height: 10px;
+            background: var(--neon-warn); filter: blur(15px);
+            opacity: 0; transition: opacity 0.5s;
+        }
+
+        /* Controls UI */
+        .controls-overlay {
+            position: absolute; bottom: 30px; display: flex; gap: 30px;
+            background: rgba(0,0,0,0.6); padding: 15px 30px;
+            border-radius: 40px; border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .switch-wrap { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+        .switch-label { font-size: 0.7rem; font-weight: 700; color: #aaa; letter-spacing: 1px; }
+        
+        /* Toggle Switch CSS */
+        .toggle { position: relative; width: 50px; height: 28px; cursor: pointer; }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; inset: 0; background-color: #333;
+            transition: .4s; border-radius: 34px; border: 1px solid #555;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 20px; width: 20px;
+            left: 3px; bottom: 3px; background-color: white;
+            transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--neon-blue); border-color: var(--neon-blue); }
+        input:checked + .slider.hot { background-color: var(--neon-warn); border-color: var(--neon-warn); }
+        input:checked + .slider:before { transform: translateX(22px); }
+
+        /* --- ANALYSIS HUD --- */
+        #hud {
+            position: absolute; right: 30px; top: 100px; width: 300px;
+            font-family: 'JetBrains Mono'; pointer-events: none;
+        }
+        
+        .hud-panel {
+            background: rgba(5, 10, 15, 0.85); border: 1px solid rgba(0, 243, 255, 0.3);
+            padding: 20px; border-radius: 4px; margin-bottom: 10px;
+            transform: translateX(50px); opacity: 0; transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .hud-panel.visible { transform: translateX(0); opacity: 1; }
+        
+        .hud-title { color: var(--neon-green); font-size: 0.8rem; margin-bottom: 8px; display: flex; justify-content: space-between; }
+        .reaction-eq { font-size: 1rem; color: white; margin-bottom: 5px; line-height: 1.4; }
+        .reaction-desc { font-size: 0.8rem; color: #888; }
+
+        /* --- TOAST NOTIFICATIONS --- */
+        .toast-container {
+            position: fixed; top: 90px; left: 50%; transform: translateX(-50%);
+            display: flex; flex-direction: column; gap: 10px; z-index: 200; pointer-events: none;
+        }
+        .toast {
+            background: rgba(20, 20, 30, 0.95); border-left: 3px solid var(--neon-blue);
+            padding: 12px 25px; border-radius: 4px; color: white;
+            font-size: 0.9rem; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            animation: slideIn 0.3s forwards, fadeOut 0.5s 2.5s forwards;
+            min-width: 250px; text-align: center;
+        }
+        @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes fadeOut { to { opacity: 0; } }
 
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>⚛️ QUANTUM LAB <span style="color:var(--neon-blue); font-size:0.8rem">v5.0 INTELLIGENT</span></h1>
-        <div style="font-family: 'JetBrains Mono'; color: rgba(255,255,255,0.5); font-size: 0.8rem;">
-            <span id="el-count">0</span> ELEMENTS LOADED
+    <div id="auth-overlay">
+        <div class="auth-container">
+            <h2 style="margin: 0 0 30px 0; font-size: 2rem; color: white;">QUANTUM<span style="color:var(--neon-blue)">LABS</span></h2>
+            
+            <div id="view-login">
+                <div class="auth-msg" id="login-msg"></div>
+                <div class="input-group">
+                    <input type="text" id="l-user" class="input-field" placeholder="OPERATOR ID" autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <input type="password" id="l-pass" class="input-field" placeholder="ACCESS CODE">
+                </div>
+                <button class="btn-auth" onclick="Auth.login()">INITIALIZE SESSION</button>
+                <div style="margin-top:20px; text-align:center; font-size:0.8rem; color:#666; cursor:pointer" onclick="Auth.toggle()">
+                    REQUEST NEW CLEARANCE
+                </div>
+            </div>
+
+            <div id="view-register" style="display:none">
+                <div class="auth-msg" id="reg-msg"></div>
+                <div class="input-group">
+                    <input type="text" id="r-user" class="input-field" placeholder="NEW OPERATOR ID" autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <input type="password" id="r-pass" class="input-field" placeholder="SET ACCESS CODE">
+                </div>
+                <button class="btn-auth" onclick="Auth.register()">GRANT CLEARANCE</button>
+                <div style="margin-top:20px; text-align:center; font-size:0.8rem; color:#666; cursor:pointer" onclick="Auth.toggle()">
+                    RETURN TO LOGIN
+                </div>
+            </div>
         </div>
-        <button class="btn" onclick="resetVessel()">FLUSH SYSTEM</button>
+    </div>
+
+    <header>
+        <div class="brand">
+            ⚛️ QUANTUM LABS <span>v9.0 PRO</span>
+        </div>
+        <div class="user-panel">
+            <span id="op-display" style="font-family:'JetBrains Mono'; font-size:0.9rem; color:var(--neon-blue)"></span>
+            <button class="btn-small" onclick="Lab.reset()">FLUSH</button>
+            <button class="btn-small btn-logout" onclick="Auth.logout()">LOGOUT</button>
+        </div>
     </header>
 
-    <div id="element-strip"></div>
-
-    <div class="main-stage">
-        
-        <div class="toast" id="toast">
-            <span class="toast-icon">ℹ️</span>
-            <span id="toast-msg">No Reaction</span>
+    <div id="element-dock">
         </div>
 
-        <div class="apparatus-cluster" id="apparatus">
-            <div class="vessel" id="drop-zone">
-                <div class="liquid" id="liquid"></div>
-                <div id="fx-layer"></div>
-                <div class="atom-container" id="atoms"></div>
+    <div class="stage">
+        <div class="toast-container" id="toast-area"></div>
 
-                <div class="thermometer-wrapper">
-                    <div class="thermometer-glass">
-                        <div class="thermometer-mercury" id="mercury"></div>
-                    </div>
-                    <div class="thermometer-bulb"></div>
-                    <div class="temp-readout" id="temp-display">25°C</div>
-                </div>
-            </div>
-
-            <div class="heater-base">
-                <div class="burner-grill">
-                    <div class="grill-bar"></div><div class="grill-bar"></div><div class="grill-bar"></div>
-                </div>
-                <div class="flame-container" id="flame-effect">
-                    <div class="flame"></div>
-                </div>
+        <div id="hud">
+            <div class="hud-panel" id="hud-panel">
+                <div class="hud-title"><span>REACTION DETECTED</span> <span id="hud-temp">25°C</span></div>
+                <div class="reaction-eq" id="hud-eq"></div>
+                <div class="reaction-desc" id="hud-desc"></div>
             </div>
         </div>
 
-        <div class="control-panel">
-            <label style="font-weight:bold; letter-spacing:1px;">BUNSEN BURNER</label>
-            <label class="switch">
-                <input type="checkbox" id="heater-toggle" onchange="toggleHeater()">
-                <span class="slider"></span>
-            </label>
+        <div class="apparatus">
+            <div class="beaker-glass">
+                <canvas id="sim-canvas" width="320" height="380"></canvas>
+            </div>
+            <div class="heater" id="heater-base">
+                <div class="coil-glow" id="coil-glow"></div>
+            </div>
         </div>
 
-        <div class="analysis-panel" id="analysis">
-            <span class="status-badge" id="chem-state-badge">NEUTRAL</span>
-            <h3 style="margin:5px 0 10px 0; color:white;">REACTION LOG</h3>
-            <div class="chem-eq" id="eq-display"></div>
-            <div class="explanation" id="why-display"></div>
-            <button onclick="closeAnalysis()" style="margin-top:15px; background:rgba(255,255,255,0.1); border:none; color:white; padding:5px 10px; cursor:pointer;">Close</button>
+        <div class="controls-overlay">
+            <div class="switch-wrap">
+                <span class="switch-label">HEATER</span>
+                <label class="toggle">
+                    <input type="checkbox" id="sw-heat" onchange="Lab.toggleHeat()">
+                    <span class="slider hot"></span>
+                </label>
+            </div>
+            <div class="switch-wrap">
+                <span class="switch-label">AGITATOR</span>
+                <label class="toggle">
+                    <input type="checkbox" id="sw-stir" onchange="Lab.toggleStir()">
+                    <span class="slider"></span>
+                </label>
+            </div>
         </div>
     </div>
 
     <script>
-        const elements = [
-            { id: 'H2O', n: 'Water', t: 'liquid', color: 'rgba(0, 243, 255, 0.4)' },
-            { id: 'HCl', n: 'Hydrochloric Acid', t: 'acid', color: 'rgba(255, 255, 150, 0.4)' },
-            { id: 'HNO3', n: 'Nitric Acid', t: 'acid', color: 'rgba(255, 255, 255, 0.3)' },
-            { id: 'H2SO4', n: 'Sulfuric Acid', t: 'acid', color: 'rgba(255, 100, 0, 0.3)' },
-            { id: 'Na', n: 'Sodium', t: 'solid', class: 'metal' },
-            { id: 'K',  n: 'Potassium', t: 'solid', class: 'metal' },
-            { id: 'Mg', n: 'Magnesium', t: 'solid', class: 'metal' },
-            { id: 'Ca', n: 'Calcium', t: 'solid', class: 'metal' },
-            { id: 'Al', n: 'Aluminum', t: 'solid', class: 'metal' },
-            { id: 'Fe', n: 'Iron', t: 'solid', class: 'iron' },
-            { id: 'Zn', n: 'Zinc', t: 'solid', class: 'metal' },
-            { id: 'Cu', n: 'Copper', t: 'solid', class: 'copper' },
-            { id: 'Au', n: 'Gold', t: 'solid', class: 'gold' },
-            { id: 'C',  n: 'Carbon', t: 'solid', class: 'carbon' },
-            { id: 'Cl2', n: 'Chlorine', t: 'gas', class: 'gas-green' },
-            { id: 'O2', n: 'Oxygen', t: 'gas', class: 'gas-blue' }
+        /**
+         * QUANTUM LABS v9.0 CORE ENGINE
+         * Integrated Auth, Physics, and Chemistry Logic
+         */
+
+        // --- 1. ELEMENT DATABASE (16 ITEMS) ---
+        const ELEMENTS = [
+            // Liquids / Solvents
+            { id: 'H2O', name: 'Water', type: 'liq', color: [200, 240, 255], density: 1.0 },
+            { id: 'HCl', name: 'Hydrochloric Acid', type: 'liq', color: [255, 255, 200], density: 1.1 },
+            { id: 'H2SO4', name: 'Sulfuric Acid', type: 'liq', color: [220, 220, 200], density: 1.8 },
+            { id: 'HNO3', name: 'Nitric Acid', type: 'liq', color: [255, 240, 200], density: 1.4 },
+            
+            // Reactive Metals
+            { id: 'Na', name: 'Sodium', type: 'sol', color: [220, 220, 220] },
+            { id: 'K', name: 'Potassium', type: 'sol', color: [200, 200, 200] },
+            { id: 'Mg', name: 'Magnesium', type: 'sol', color: [240, 240, 240] },
+            { id: 'Ca', name: 'Calcium', type: 'sol', color: [180, 180, 180] },
+            
+            // Transition Metals
+            { id: 'Fe', name: 'Iron', type: 'sol', color: [100, 100, 100] },
+            { id: 'Cu', name: 'Copper', type: 'sol', color: [184, 115, 51] },
+            { id: 'Zn', name: 'Zinc', type: 'sol', color: [160, 170, 180] },
+            { id: 'Al', name: 'Aluminum', type: 'sol', color: [200, 210, 220] },
+            
+            // Salts & Others
+            { id: 'CuSO4', name: 'Copper Sulfate', type: 'salt', color: [0, 100, 255] },
+            { id: 'KMnO4', name: 'Permanganate', type: 'salt', color: [128, 0, 128] },
+            { id: 'C', name: 'Carbon', type: 'sol', color: [30, 30, 30] },
+            { id: 'Cl2', name: 'Chlorine Gas', type: 'gas', color: [100, 255, 100] }
         ];
 
-        const reactivitySeries = {
-            'K': 10, 'Na': 9, 'Ca': 8, 'Mg': 7, 'Al': 6, 
-            'Zn': 5, 'Fe': 4, 'Cu': 2, 'Au': 0, 
-            'C': 1
+        // --- 2. AUTHENTICATION MODULE ---
+        const Auth = {
+            init: () => {
+                const user = localStorage.getItem('ql_user');
+                if(user) {
+                    document.getElementById('auth-overlay').classList.add('hidden');
+                    document.getElementById('op-display').innerText = `OP: ${user}`;
+                    Lab.init();
+                }
+            },
+            toggle: () => {
+                const login = document.getElementById('view-login');
+                const reg = document.getElementById('view-register');
+                if(login.style.display === 'none') {
+                    login.style.display = 'block'; reg.style.display = 'none';
+                } else {
+                    login.style.display = 'none'; reg.style.display = 'block';
+                }
+            },
+            login: () => {
+                const u = document.getElementById('l-user').value.trim();
+                const p = document.getElementById('l-pass').value.trim();
+                const db = JSON.parse(localStorage.getItem('ql_db') || '[]');
+                const valid = db.find(x => x.u === u && x.p === p);
+                
+                if(valid) {
+                    localStorage.setItem('ql_user', u);
+                    location.reload();
+                } else {
+                    Auth.err('login-msg', 'INVALID CREDENTIALS');
+                }
+            },
+            register: () => {
+                const u = document.getElementById('r-user').value.trim();
+                const p = document.getElementById('r-pass').value.trim();
+                if(u.length < 3) return Auth.err('reg-msg', 'ID TOO SHORT');
+                
+                const db = JSON.parse(localStorage.getItem('ql_db') || '[]');
+                if(db.find(x => x.u === u)) return Auth.err('reg-msg', 'ID TAKEN');
+                
+                db.push({u, p});
+                localStorage.setItem('ql_db', JSON.stringify(db));
+                Auth.toggle();
+                Auth.err('login-msg', 'REGISTRATION COMPLETE');
+            },
+            logout: () => {
+                localStorage.removeItem('ql_user');
+                location.reload();
+            },
+            err: (id, msg) => {
+                const el = document.getElementById(id);
+                el.innerText = msg;
+                setTimeout(() => el.innerText = '', 2000);
+            }
         };
 
-        document.getElementById('el-count').innerText = elements.length;
-
-        let state = { 
-            liquid: null, 
-            chemType: 'neutral', 
-            solids: [], // Stores objects { id: 'Na', checked: false }
-            gases: [], 
-            cooldown: false 
-        };
-        let tempState = { current: 25, target: 25, heating: false };
-
-        const strip = document.getElementById('element-strip');
-        
-        // --- CREATE ELEMENTS WITH ORBITAL FX ---
-        elements.forEach(el => {
-            const div = document.createElement('div');
-            div.className = `element-card t-${el.t}`;
-            div.setAttribute('draggable', true);
+        // --- 3. PHYSICS & RENDER ENGINE (CANVAS) ---
+        const Physics = {
+            ctx: null,
+            width: 320,
+            height: 380,
+            frame: 0,
             
-            // Add Orbital Rings
-            div.innerHTML = `
-                <div class="orbit-ring">
-                    <div class="electron"></div>
-                    <div class="electron"></div>
-                </div>
-                <span class="el-sym">${el.id.replace(/\d/g, sub => `<sub>${sub}</sub>`)}</span>
-                <span class="el-name">${el.n}</span>
-            `;
+            // State
+            liquidLevel: 0,
+            targetLevel: 0,
+            liquidColor: [200, 240, 255], // RGB
+            liquidAlpha: 0,
             
-            div.onclick = () => addElement(el);
-            div.addEventListener('dragstart', (e) => {
-                div.classList.add('dragging');
-                e.dataTransfer.setData('application/json', JSON.stringify(el));
-            });
-            div.addEventListener('dragend', () => div.classList.remove('dragging'));
-            strip.appendChild(div);
-        });
+            // Particles
+            bubbles: [],
+            debris: [],
+            
+            init: () => {
+                const cvs = document.getElementById('sim-canvas');
+                Physics.ctx = cvs.getContext('2d');
+                Physics.loop();
+            },
 
-        const dropZone = document.getElementById('drop-zone');
-        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-active'); });
-        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-active'));
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault(); dropZone.classList.remove('drag-active');
-            try { addElement(JSON.parse(e.dataTransfer.getData('application/json'))); } catch (err) {}
-        });
-
-        function addElement(el) {
-            if (['liquid', 'acid'].includes(el.t)) {
-                if (state.chemType === 'base' && el.t === 'acid') {
-                     triggerReaction('NEUTRALIZATION', { eq: `OH⁻ + H⁺ → H₂O + Salt`, why: `Adding ${el.n} neutralized the basic solution.` });
-                     state.chemType = 'neutral';
-                     setLiquidColor('rgba(10, 255, 104, 0.4)');
-                     createFumes(5, 'white');
-                     return;
+            addLiquid: (colorRGB) => {
+                Physics.targetLevel = 250; // Max height
+                Physics.liquidAlpha = 0.8;
+                // Blend color if liquid exists, else set
+                if(Physics.liquidLevel > 10) {
+                    Physics.liquidColor = Physics.liquidColor.map((c, i) => (c + colorRGB[i])/2);
+                } else {
+                    Physics.liquidColor = colorRGB;
                 }
-                if (state.liquid && state.liquid !== el.id) {
-                    showToast(`Cannot mix ${el.n} into current liquid without flushing.`); return;
+            },
+
+            addDebris: (color, amount) => {
+                for(let i=0; i<amount; i++) {
+                    Physics.debris.push({
+                        x: Math.random() * Physics.width,
+                        y: -20,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: Math.random() * 5 + 2,
+                        size: Math.random() * 4 + 2,
+                        color: `rgb(${color.join(',')})`,
+                        dissolving: false
+                    });
                 }
-                state.liquid = el.id;
-                state.chemType = el.t === 'acid' ? 'acid' : 'neutral';
-                updateLiquidVisuals(el.color);
-            } else if (el.t === 'gas') {
-                if (!state.gases.includes(el.id)) state.gases.push(el.id);
-                spawnAtom(el);
-            } else {
-                // Add solid with 'checked' flag set to false
-                state.solids.push({ id: el.id, checked: false });
-                spawnAtom(el);
-            }
-            scanBeaker();
-        }
+            },
 
-        function toggleHeater() {
-            tempState.heating = document.getElementById('heater-toggle').checked;
-            document.getElementById('flame-effect').classList.toggle('active', tempState.heating);
-            tempState.target = tempState.heating ? 250 : 25;
-        }
+            createBubbles: (count, type='normal') => {
+                for(let i=0; i<count; i++) {
+                    Physics.bubbles.push({
+                        x: Math.random() * Physics.width,
+                        y: Physics.height - 20,
+                        vy: -(Math.random() * 2 + 1),
+                        size: Math.random() * 3 + 1,
+                        type: type
+                    });
+                }
+            },
 
-        setInterval(() => {
-            if (Math.abs(tempState.current - tempState.target) > 0.5) {
-                const speed = tempState.heating ? 1.0 : 0.5; 
-                tempState.current += (tempState.target > tempState.current) ? speed : -speed;
-                updateThermometer();
-                scanBeaker();
-            }
-        }, 50);
+            loop: () => {
+                const ctx = Physics.ctx;
+                const W = Physics.width;
+                const H = Physics.height;
+                Physics.frame++;
 
-        function updateThermometer() {
-            const display = document.getElementById('temp-display');
-            const mercury = document.getElementById('mercury');
-            
-            let heightPerc = (tempState.current / 250) * 100;
-            if(heightPerc < 5) heightPerc = 5; if(heightPerc > 100) heightPerc = 100;
+                ctx.clearRect(0, 0, W, H);
 
-            display.innerText = Math.round(tempState.current) + '°C';
-            mercury.style.height = heightPerc + '%';
-        }
+                // 1. Draw Liquid (Sine Wave Physics)
+                if(Physics.liquidLevel > 0.1 || Physics.targetLevel > 0.1) {
+                    // Smooth transition for level
+                    Physics.liquidLevel += (Physics.targetLevel - Physics.liquidLevel) * 0.05;
 
-        // --- SMART SCANNER ---
-        function scanBeaker() {
-            if(state.cooldown) return; 
+                    ctx.beginPath();
+                    // Wave calculation
+                    const stirFactor = Lab.state.stirring ? 15 : 2;
+                    const heatFactor = Lab.state.heating ? 5 : 0;
+                    const waveHeight = stirFactor + heatFactor;
+                    const freq = Lab.state.stirring ? 0.2 : 0.05;
 
-            const { liquid, solids, gases, chemType } = state;
-            const temp = tempState.current;
-            
-            // Sort solids by reactivity
-            state.solids.sort((a, b) => (reactivitySeries[b.id] || 0) - (reactivitySeries[a.id] || 0));
-
-            // We iterate through solids. If something reacts, we stop.
-            // If something DOES NOT react, and hasn't been checked, we warn the user.
-            
-            for (let solidObj of state.solids) {
-                const solid = solidObj.id;
-                let reacted = false;
-
-                // --- LIQUID REACTIONS ---
-                if (liquid) {
-                    // 1. Alkali
-                    if (liquid === 'H2O' && chemType !== 'acid' && (solid === 'K' || solid === 'Na')) {
-                        processReaction(solid, 'ALKALI REACTION', { eq: `2${solid} + 2H₂O → 2${solid}OH + H₂`, why: `Violent reaction! Solution becomes Basic.` }, () => {
-                            spawnExplosion(150, 350); setLiquidColor('#6c5ce7'); state.chemType = 'base'; updateBadge('BASIC (pH 14)');
-                        }); reacted = true;
+                    for(let x=0; x<=W; x+=5) {
+                        const y = H - Physics.liquidLevel + Math.sin(x * 0.02 + Physics.frame * freq) * waveHeight;
+                        if(x===0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
                     }
-                    // 2. Amphoteric (Requires Base)
-                    else if (chemType === 'base' && (solid === 'Al' || solid === 'Zn')) {
-                         processReaction(solid, 'COMPLEX FORMATION', { eq: `2${solid} + 2OH⁻ + ... → [${solid}(OH)₄]⁻`, why: `${solid} dissolves in Base.` }, () => {
-                            createFumes(10, 'white');
-                        }); reacted = true;
-                    }
-                    // 3. Calcium
-                    else if (liquid === 'H2O' && solid === 'Ca') {
-                        processReaction(solid, 'DISSOLUTION', { eq: `Ca + 2H₂O → Ca(OH)₂ + H₂`, why: "Calcium reacts steadily." }, () => {
-                            setLiquidColor('rgba(255, 255, 255, 0.8)'); state.chemType = 'base'; updateBadge('BASIC (pH 10)'); createFumes(5, 'white');
-                        }); reacted = true;
-                    }
-                    // 4. Acid
-                    else if (chemType === 'acid' && ['Mg', 'Al', 'Zn', 'Fe', 'Na', 'K', 'Ca'].includes(solid)) {
-                        processReaction(solid, 'ACID DISPLACEMENT', { eq: `${solid} + 2H⁺ → ${solid}²⁺ + H₂`, why: "Metal dissolves in acid." }, () => {
-                            createFumes(8, 'white'); if (solid === 'Fe') setLiquidColor('#badc58');
-                        }); reacted = true;
-                    }
-                    // 5. Copper Specials
-                    else if (solid === 'Cu' && liquid === 'HNO3') {
-                        processReaction(solid, 'OXIDATION', { eq: `Cu + 4HNO₃ → ...`, why: "Copper dissolves in Nitric Acid." }, () => {
-                            setLiquidColor('#0984e3'); createFumes(25, 'orange');
-                        }); reacted = true;
-                    }
-                    else if (solid === 'Cu' && liquid === 'H2SO4' && temp > 80) {
-                        processReaction(solid, 'THERMAL OXIDATION', { eq: `Cu + 2H₂SO₄ → CuSO₄ + SO₂`, why: "Hot Acid oxidizes Copper." }, () => {
-                            setLiquidColor('#00a8ff'); createFumes(10, 'white');
-                        }); reacted = true;
-                    }
+                    ctx.lineTo(W, H);
+                    ctx.lineTo(0, H);
+                    ctx.fillStyle = `rgba(${Physics.liquidColor[0]}, ${Physics.liquidColor[1]}, ${Physics.liquidColor[2]}, ${Physics.liquidAlpha})`;
+                    ctx.fill();
                 }
 
-                // --- DRY GAS REACTIONS ---
-                if (!liquid && !reacted) {
-                    if (gases.includes('O2') && solid === 'C' && temp > 100) {
-                        processReaction(solid, 'COMBUSTION', { eq: `C + O₂ → CO₂`, why: "Carbon burns in Oxygen." }, () => {
-                            spawnExplosion(150, 300); createFumes(20, 'gray');
-                        }); reacted = true;
-                    }
-                    else if (gases.includes('Cl2') && solid === 'Na' && temp > 50) {
-                        processReaction(solid, 'SYNTHESIS', { eq: `2Na + Cl₂ → 2NaCl`, why: "Sodium burns in Chlorine." }, () => {
-                            spawnExplosion(150, 300); createFumes(20, 'yellow');
-                        }); reacted = true;
-                    }
-                }
-
-                // --- NO REACTION LOGIC ---
-                // If it didn't react, and we haven't checked it yet...
-                if (!reacted && !solidObj.checked) {
-                    solidObj.checked = true; // Mark as checked so we don't spam
+                // 2. Draw Debris (Solids falling)
+                Physics.debris.forEach((d, i) => {
+                    d.x += d.vx;
+                    d.y += d.vy;
                     
-                    if (solid === 'Au') showToast("Gold is inert (Noble Metal).");
-                    else if (solid === 'Cu' && liquid === 'H2O') showToast("Copper does not react with water.");
-                    else if (solid === 'Cu' && liquid === 'HCl') showToast("Copper is below Hydrogen in reactivity series.");
-                    else if (solid === 'Fe' && liquid === 'H2O') showToast("Iron rusts too slowly to see here.");
-                    else if (solid === 'C' && liquid) showToast("Carbon is generally insoluble.");
-                    else if (!liquid && gases.length === 0) showToast("Heating solid alone (Melting not simulated).");
-                    else if (liquid === 'H2O' && ['Mg', 'Al', 'Zn'].includes(solid)) showToast(`${elements.find(e=>e.id===solid).n} has an oxide layer.`);
-                    else showToast("No reaction detected.");
+                    // Stirring physics
+                    if(Lab.state.stirring && d.y > H - Physics.liquidLevel) {
+                        d.vx += Math.sin(Physics.frame * 0.1) * 0.5;
+                        d.vy = Math.sin(Physics.frame * 0.1 + d.x) * 2; 
+                    } else if (d.y > H - 10) {
+                        d.y = H - 10;
+                        d.vy = 0;
+                        d.vx *= 0.9; // Friction
+                    }
+
+                    ctx.fillStyle = d.color;
+                    ctx.beginPath();
+                    ctx.arc(d.x, d.y, d.size, 0, Math.PI*2);
+                    ctx.fill();
+                });
+
+                // 3. Draw Bubbles
+                if(Lab.state.heating && Physics.liquidLevel > 50 && Physics.frame % 5 === 0) Physics.createBubbles(1);
+                
+                for(let i = Physics.bubbles.length - 1; i >= 0; i--) {
+                    let b = Physics.bubbles[i];
+                    b.y += b.vy;
+                    b.x += Math.sin(b.y * 0.05) * 0.5; // Wobble
+
+                    if(Lab.state.stirring) b.x += Math.cos(Physics.frame * 0.1) * 2;
+
+                    ctx.fillStyle = b.type === 'gas' ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)';
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, b.size, 0, Math.PI*2);
+                    ctx.fill();
+
+                    if(b.y < H - Physics.liquidLevel) {
+                        Physics.bubbles.splice(i, 1); // Pop at surface
+                    }
                 }
 
-                if (reacted) return; // Stop loop if reaction happened
+                requestAnimationFrame(Physics.loop);
             }
-        }
+        };
 
-        function processReaction(solidID, title, data, visualFn) {
-            visualFn();
-            triggerReaction(title, data);
-            consumeSolid(solidID);
-            state.cooldown = true;
-            setTimeout(() => { state.cooldown = false; }, 2000);
-        }
+        // --- 4. CHEMISTRY LOGIC ---
+        const Lab = {
+            state: {
+                liquid: null, // 'H2O', 'HCl', etc.
+                solutes: [], // Array of dissolved/added IDs
+                temp: 25,
+                heating: false,
+                stirring: false,
+                color: null
+            },
 
-        function consumeSolid(id) {
-            const index = state.solids.findIndex(s => s.id === id);
-            if (index > -1) state.solids.splice(index, 1);
-            
-            const atoms = document.querySelectorAll(`.atom`);
-            for (let atom of atoms) {
-                if (atom.innerText.includes(id.replace(/\d/g,'')) && !atom.classList.contains('dissolving')) {
-                    atom.classList.add('dissolving'); 
-                    setTimeout(() => atom.remove(), 500);
-                    break;
+            init: () => {
+                // Generate UI
+                const dock = document.getElementById('element-dock');
+                ELEMENTS.forEach(el => {
+                    const card = document.createElement('div');
+                    card.className = 'element-card';
+                    card.innerHTML = `
+                        <div class="el-tag" style="background:rgb(${el.color.join(',')})"></div>
+                        <span class="el-symbol">${el.id}</span>
+                        <span class="el-name">${el.name}</span>
+                    `;
+                    card.onclick = () => Lab.addElement(el);
+                    dock.appendChild(card);
+                });
+                Physics.init();
+                setInterval(Lab.thermalTick, 1000); // Temperature loop
+            },
+
+            reset: () => {
+                Lab.state = { liquid: null, solutes: [], temp: 25, heating: false, stirring: false, color: null };
+                Physics.targetLevel = 0;
+                Physics.liquidLevel = 0;
+                Physics.debris = [];
+                Physics.bubbles = [];
+                Lab.updateHUD(null);
+                document.getElementById('sw-heat').checked = false;
+                document.getElementById('sw-stir').checked = false;
+                Lab.toggleHeat(); Lab.toggleStir();
+            },
+
+            addElement: (el) => {
+                if(el.type === 'liq') {
+                    if(Lab.state.liquid) {
+                        Lab.toast("Mixture contaminated. Flush required for pure results.", "warn");
+                        // Simple mixing visual
+                        Physics.addLiquid(el.color);
+                    } else {
+                        Lab.state.liquid = el.id;
+                        Lab.state.color = el.color;
+                        Physics.addLiquid(el.color);
+                    }
+                } else if (el.type === 'sol' || el.type === 'salt') {
+                    if(!Lab.state.liquid) return Lab.toast("Add a solvent liquid first.", "warn");
+                    Physics.addDebris(el.color, 5);
+                    Lab.state.solutes.push(el.id);
+                    Lab.checkReaction();
+                } else if (el.type === 'gas') {
+                    if(Lab.state.liquid) Physics.createBubbles(20, 'gas');
                 }
+            },
+
+            toggleHeat: () => {
+                Lab.state.heating = document.getElementById('sw-heat').checked;
+                document.getElementById('heater-base').classList.toggle('active', Lab.state.heating);
+                document.getElementById('coil-glow').style.opacity = Lab.state.heating ? '1' : '0';
+                Lab.checkReaction();
+            },
+
+            toggleStir: () => {
+                Lab.state.stirring = document.getElementById('sw-stir').checked;
+            },
+
+            thermalTick: () => {
+                if(Lab.state.heating && Lab.state.temp < 100) Lab.state.temp += 5;
+                if(!Lab.state.heating && Lab.state.temp > 25) Lab.state.temp -= 2;
+                document.getElementById('hud-temp').innerText = `${Lab.state.temp}°C`;
+                if(Lab.state.temp > 90 && Lab.state.liquid) Physics.createBubbles(2); // Boil
+            },
+
+            // --- THE REACTION MATRIX ---
+            checkReaction: () => {
+                const s = Lab.state;
+                const solutes = s.solutes;
+                const liquid = s.liquid;
+                
+                if(!liquid) return;
+
+                // Reaction: Alkali Metals + Water
+                if(liquid === 'H2O') {
+                    if(solutes.includes('Na')) Lab.trigger("2Na + 2H₂O → 2NaOH + H₂", "Exothermic. Rapid Hydrogen release.", [255,255,255], true);
+                    if(solutes.includes('K')) Lab.trigger("2K + 2H₂O → 2KOH + H₂", "Violent! Lilac flame ignition.", [200,100,255], true);
+                    if(solutes.includes('Ca')) Lab.trigger("Ca + 2H₂O → Ca(OH)₂ + H₂", "Steady bubbling. White precipitate.", [240,240,255], false);
+                    
+                    // Salts Color Changes
+                    if(solutes.includes('CuSO4')) { Physics.liquidColor = [0, 150, 255]; Lab.toast("Solution turned Blue (Copper II)"); }
+                    if(solutes.includes('KMnO4')) { Physics.liquidColor = [180, 0, 180]; Lab.toast("Solution turned Purple (Permanganate)"); }
+                
+                    // Displacement: Fe + CuSO4
+                    if(solutes.includes('CuSO4') && solutes.includes('Fe')) {
+                        setTimeout(() => {
+                            Physics.liquidColor = [100, 200, 100]; // Greenish
+                            Lab.trigger("Fe + CuSO₄ → FeSO₄ + Cu", "Single Displacement. Iron replaces Copper.", [100,200,100], false);
+                        }, 2000);
+                    }
+                }
+
+                // Reaction: Acids + Metals
+                if((liquid === 'HCl' || liquid === 'H2SO4')) {
+                    if(solutes.includes('Mg')) Lab.trigger("Mg + 2H⁺ → Mg²⁺ + H₂", "Rapid effervescence.", null, true);
+                    if(solutes.includes('Zn')) Lab.trigger("Zn + 2H⁺ → Zn²⁺ + H₂", "Hydrogen gas evolution.", null, true);
+                    if(solutes.includes('Fe')) Lab.trigger("Fe + 2H⁺ → Fe²⁺ + H₂", "Slow bubbling. Pale green solution.", [200,255,200], true);
+                    if(solutes.includes('Cu')) {
+                        if(liquid === 'HNO3') Lab.trigger("Cu + 4HNO₃ → Cu(NO₃)₂ + 2NO₂ + 2H₂O", "Toxic brown NO₂ gas released!", [0, 100, 0], true);
+                        else if(Lab.state.heating) Lab.toast("Reaction requires oxidizer or higher temp.", "warn");
+                    }
+                }
+            },
+
+            trigger: (eq, desc, newColor, violent) => {
+                Lab.updateHUD(eq, desc);
+                if(newColor) Physics.liquidColor = newColor;
+                if(violent) {
+                    Physics.createBubbles(50, 'gas');
+                    Lab.toast("REACTION OCCURRING", "warn");
+                }
+                
+                // Clear solutes processed (simplified)
+                Lab.state.solutes = []; 
+                Physics.debris = []; // Dissolve visuals
+            },
+
+            updateHUD: (eq, desc) => {
+                const panel = document.getElementById('hud-panel');
+                if(!eq) {
+                    panel.classList.remove('visible');
+                } else {
+                    document.getElementById('hud-eq').innerText = eq;
+                    document.getElementById('hud-desc').innerText = desc;
+                    panel.classList.add('visible');
+                }
+            },
+
+            toast: (msg, type='info') => {
+                const area = document.getElementById('toast-area');
+                const t = document.createElement('div');
+                t.className = 'toast';
+                t.innerText = msg;
+                if(type === 'warn') t.style.borderLeftColor = 'var(--neon-warn)';
+                area.appendChild(t);
+                setTimeout(() => t.remove(), 3000);
             }
-        }
+        };
 
-        function showToast(msg) {
-            const toast = document.getElementById('toast');
-            document.getElementById('toast-msg').innerText = msg;
-            toast.classList.add('active');
-            setTimeout(() => toast.classList.remove('active'), 3000);
-        }
+        // Initialize Auth on Load
+        window.onload = Auth.init;
 
-        // --- UI & FX ---
-
-        function spawnExplosion(x, y) {
-            const container = document.getElementById('fx-layer');
-            const apparatus = document.getElementById('apparatus');
-            const flash = document.createElement('div');
-            flash.className = 'flash-overlay';
-            document.body.appendChild(flash);
-            setTimeout(() => flash.remove(), 300);
-
-            apparatus.classList.remove('shake');
-            void apparatus.offsetWidth; 
-            apparatus.classList.add('shake');
-
-            const colors = ['#ff0000', '#ffaa00', '#ffff00', '#333'];
-            for(let i=0; i<40; i++) {
-                const p = document.createElement('div');
-                p.className = 'ex-particle';
-                const angle = Math.random() * Math.PI * 2;
-                const dist = 50 + Math.random() * 150;
-                p.style.left = (Math.random() * 200 + 50) + 'px';
-                p.style.top = '350px';
-                p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-                p.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
-                p.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
-                container.appendChild(p);
-                setTimeout(() => p.remove(), 800);
-            }
-        }
-
-        function createFumes(count, color) {
-            const container = document.getElementById('fx-layer');
-            const fumeColor = color === 'orange' ? '#e67e22' : (color === 'yellow' ? '#f1c40f' : (color === 'gray' ? '#636e72' : 'white'));
-            for(let i=0; i<count; i++) {
-                const b = document.createElement('div');
-                b.className = 'fume';
-                b.style.background = fumeColor;
-                b.style.left = Math.random()*250+'px';
-                b.style.top = '80%';
-                b.style.animationDelay = Math.random() * 0.5 + 's';
-                container.appendChild(b);
-            }
-        }
-
-        function updateLiquidVisuals(color) {
-            const liq = document.getElementById('liquid');
-            liq.style.height = '60%';
-            liq.style.background = color;
-            liq.style.boxShadow = `0 0 30px ${color}`;
-            updateBadge(state.chemType === 'acid' ? 'ACIDIC' : 'NEUTRAL');
-        }
-
-        function setLiquidColor(color) {
-            const liq = document.getElementById('liquid');
-            liq.style.background = color;
-            liq.style.boxShadow = `0 0 50px ${color}`;
-        }
-
-        function updateBadge(text) {
-            document.getElementById('chem-state-badge').innerText = text;
-        }
-
-        function spawnAtom(el) {
-            const container = document.getElementById('atoms');
-            const atom = document.createElement('div');
-            atom.className = `atom ${el.class || ''}`;
-            atom.innerHTML = el.id.replace(/\d/g, '');
-            atom.style.left = (Math.random() * 240 + 30) + 'px';
-            if (el.t === 'gas') {
-                atom.style.top = '80%';
-                atom.style.animation = 'floatUp 3s infinite linear';
-            }
-            container.appendChild(atom);
-        }
-
-        function triggerReaction(title, data) {
-            const panel = document.getElementById('analysis');
-            panel.querySelector('h3').innerText = title;
-            document.getElementById('eq-display').innerText = data.eq;
-            document.getElementById('why-display').innerText = data.why;
-            panel.classList.add('active');
-        }
-
-        function closeAnalysis() {
-            document.getElementById('analysis').classList.remove('active');
-        }
-
-        function resetVessel() {
-            state = { liquid: null, solids: [], gases: [], chemType: 'neutral', cooldown: false };
-            document.getElementById('liquid').style.height = '0%';
-            document.getElementById('atoms').innerHTML = '';
-            document.getElementById('fx-layer').innerHTML = '';
-            updateBadge('NEUTRAL');
-            closeAnalysis();
-        }
     </script>
 </body>
 </html>
