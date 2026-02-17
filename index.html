@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quantum Labs v9.0 - Omnichrom Simulation</title>
+    <title>Quantum Labs v9.2 - FX Update</title>
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     
     <style>
@@ -89,7 +89,7 @@
         .btn-logout { border-color: rgba(255, 50, 50, 0.3); color: #ff6b6b; }
         .btn-logout:hover { background: var(--neon-warn); color: white; border-color: var(--neon-warn); }
 
-        /* --- ELEMENT SCROLL STRIP (16 ITEMS) --- */
+        /* --- ELEMENT SCROLL STRIP --- */
         #element-dock {
             height: 110px; border-bottom: var(--border);
             background: rgba(0,0,0,0.2);
@@ -124,7 +124,6 @@
             perspective: 1000px; overflow: hidden;
         }
 
-        /* The Beaker Assembly */
         .apparatus {
             position: relative; width: 320px; height: 450px;
             display: flex; flex-direction: column; align-items: center;
@@ -141,13 +140,11 @@
             backdrop-filter: blur(2px);
         }
 
-        /* Canvas for High-Performance Fluid Simulation */
         #sim-canvas {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             opacity: 0.9;
         }
 
-        /* Heater Plate */
         .heater {
             width: 240px; height: 50px; background: #2d3436;
             border-radius: 8px; margin-top: 15px;
@@ -162,7 +159,6 @@
             opacity: 0; transition: opacity 0.5s;
         }
 
-        /* Controls UI */
         .controls-overlay {
             position: absolute; bottom: 30px; display: flex; gap: 30px;
             background: rgba(0,0,0,0.6); padding: 15px 30px;
@@ -173,7 +169,6 @@
         .switch-wrap { display: flex; flex-direction: column; align-items: center; gap: 5px; }
         .switch-label { font-size: 0.7rem; font-weight: 700; color: #aaa; letter-spacing: 1px; }
         
-        /* Toggle Switch CSS */
         .toggle { position: relative; width: 50px; height: 28px; cursor: pointer; }
         .toggle input { opacity: 0; width: 0; height: 0; }
         .slider {
@@ -261,7 +256,7 @@
 
     <header>
         <div class="brand">
-            ⚛️ QUANTUM LABS <span>v9.0 PRO</span>
+            ⚛️ QUANTUM LABS <span>v9.2 FX</span>
         </div>
         <div class="user-panel">
             <span id="op-display" style="font-family:'JetBrains Mono'; font-size:0.9rem; color:var(--neon-blue)"></span>
@@ -312,19 +307,15 @@
     </div>
 
     <script>
-        /**
-         * QUANTUM LABS v9.0 CORE ENGINE
-         * Integrated Auth, Physics, and Chemistry Logic
-         */
-
-        // --- 1. ELEMENT DATABASE (16 ITEMS) ---
+        // --- 1. ELEMENT DATABASE ---
         const ELEMENTS = [
             // Liquids / Solvents
-            { id: 'H2O', name: 'Water', type: 'liq', color: [200, 240, 255], density: 1.0 },
-            { id: 'HCl', name: 'Hydrochloric Acid', type: 'liq', color: [255, 255, 200], density: 1.1 },
-            { id: 'H2SO4', name: 'Sulfuric Acid', type: 'liq', color: [220, 220, 200], density: 1.8 },
-            { id: 'HNO3', name: 'Nitric Acid', type: 'liq', color: [255, 240, 200], density: 1.4 },
-            
+            { id: 'H2O', name: 'Water', type: 'liq', color: [200, 240, 255] },
+            { id: 'HCl', name: 'Hydrochloric Acid', type: 'liq', color: [255, 255, 200] },
+            { id: 'H2SO4', name: 'Sulfuric Acid', type: 'liq', color: [220, 220, 200] },
+            { id: 'HNO3', name: 'Nitric Acid', type: 'liq', color: [255, 240, 200] },
+            { id: 'NaOH', name: 'Sodium Hydroxide', type: 'liq', color: [240, 240, 255] },
+
             // Reactive Metals
             { id: 'Na', name: 'Sodium', type: 'sol', color: [220, 220, 220] },
             { id: 'K', name: 'Potassium', type: 'sol', color: [200, 200, 200] },
@@ -380,10 +371,8 @@
                 const u = document.getElementById('r-user').value.trim();
                 const p = document.getElementById('r-pass').value.trim();
                 if(u.length < 3) return Auth.err('reg-msg', 'ID TOO SHORT');
-                
                 const db = JSON.parse(localStorage.getItem('ql_db') || '[]');
                 if(db.find(x => x.u === u)) return Auth.err('reg-msg', 'ID TAKEN');
-                
                 db.push({u, p});
                 localStorage.setItem('ql_db', JSON.stringify(db));
                 Auth.toggle();
@@ -400,7 +389,7 @@
             }
         };
 
-        // --- 3. PHYSICS & RENDER ENGINE (CANVAS) ---
+        // --- 3. PHYSICS & RENDER ENGINE ---
         const Physics = {
             ctx: null,
             width: 320,
@@ -410,12 +399,14 @@
             // State
             liquidLevel: 0,
             targetLevel: 0,
-            liquidColor: [200, 240, 255], // RGB
+            liquidColor: [200, 240, 255],
             liquidAlpha: 0,
+            shake: 0, // Shake magnitude
             
             // Particles
             bubbles: [],
             debris: [],
+            explosions: [], // NEW: Explosion particle system
             
             init: () => {
                 const cvs = document.getElementById('sim-canvas');
@@ -424,13 +415,13 @@
             },
 
             addLiquid: (colorRGB) => {
-                Physics.targetLevel = 250; // Max height
+                Physics.targetLevel = Math.min(350, Physics.targetLevel + 80); 
                 Physics.liquidAlpha = 0.8;
-                // Blend color if liquid exists, else set
                 if(Physics.liquidLevel > 10) {
                     Physics.liquidColor = Physics.liquidColor.map((c, i) => (c + colorRGB[i])/2);
                 } else {
                     Physics.liquidColor = colorRGB;
+                    Physics.targetLevel = 200;
                 }
             },
 
@@ -443,7 +434,32 @@
                         vy: Math.random() * 5 + 2,
                         size: Math.random() * 4 + 2,
                         color: `rgb(${color.join(',')})`,
-                        dissolving: false
+                    });
+                }
+            },
+
+            // NEW: Create visual explosion
+            explode: () => {
+                Physics.shake = 20; // Set shake intensity
+                const count = 60;
+                const centerX = Physics.width / 2;
+                const centerY = Physics.height - Physics.liquidLevel;
+                
+                for(let i=0; i<count; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * 8 + 2;
+                    // Colors: White, Yellow, Orange, Red
+                    const colors = ['255,255,255', '255,200,50', '255,100,0', '255,50,50'];
+                    const col = colors[Math.floor(Math.random() * colors.length)];
+                    
+                    Physics.explosions.push({
+                        x: centerX,
+                        y: centerY,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        size: Math.random() * 6 + 2,
+                        life: 1.0, // Alpha/Life
+                        color: col
                     });
                 }
             },
@@ -466,15 +482,22 @@
                 const H = Physics.height;
                 Physics.frame++;
 
+                // Camera Shake Effect
+                ctx.save();
+                if(Physics.shake > 0) {
+                    const dx = (Math.random() - 0.5) * Physics.shake;
+                    const dy = (Math.random() - 0.5) * Physics.shake;
+                    ctx.translate(dx, dy);
+                    Physics.shake *= 0.9; // Damping
+                    if(Physics.shake < 0.5) Physics.shake = 0;
+                }
+
                 ctx.clearRect(0, 0, W, H);
 
-                // 1. Draw Liquid (Sine Wave Physics)
+                // 1. Draw Liquid
                 if(Physics.liquidLevel > 0.1 || Physics.targetLevel > 0.1) {
-                    // Smooth transition for level
                     Physics.liquidLevel += (Physics.targetLevel - Physics.liquidLevel) * 0.05;
-
                     ctx.beginPath();
-                    // Wave calculation
                     const stirFactor = Lab.state.stirring ? 15 : 2;
                     const heatFactor = Lab.state.heating ? 5 : 0;
                     const waveHeight = stirFactor + heatFactor;
@@ -491,47 +514,53 @@
                     ctx.fill();
                 }
 
-                // 2. Draw Debris (Solids falling)
-                Physics.debris.forEach((d, i) => {
+                // 2. Draw Debris
+                Physics.debris.forEach((d) => {
                     d.x += d.vx;
                     d.y += d.vy;
-                    
-                    // Stirring physics
                     if(Lab.state.stirring && d.y > H - Physics.liquidLevel) {
                         d.vx += Math.sin(Physics.frame * 0.1) * 0.5;
                         d.vy = Math.sin(Physics.frame * 0.1 + d.x) * 2; 
                     } else if (d.y > H - 10) {
-                        d.y = H - 10;
-                        d.vy = 0;
-                        d.vx *= 0.9; // Friction
+                        d.y = H - 10; d.vy = 0; d.vx *= 0.9;
                     }
-
                     ctx.fillStyle = d.color;
-                    ctx.beginPath();
-                    ctx.arc(d.x, d.y, d.size, 0, Math.PI*2);
-                    ctx.fill();
+                    ctx.beginPath(); ctx.arc(d.x, d.y, d.size, 0, Math.PI*2); ctx.fill();
                 });
 
                 // 3. Draw Bubbles
                 if(Lab.state.heating && Physics.liquidLevel > 50 && Physics.frame % 5 === 0) Physics.createBubbles(1);
-                
                 for(let i = Physics.bubbles.length - 1; i >= 0; i--) {
                     let b = Physics.bubbles[i];
                     b.y += b.vy;
-                    b.x += Math.sin(b.y * 0.05) * 0.5; // Wobble
-
+                    b.x += Math.sin(b.y * 0.05) * 0.5;
                     if(Lab.state.stirring) b.x += Math.cos(Physics.frame * 0.1) * 2;
-
                     ctx.fillStyle = b.type === 'gas' ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)';
-                    ctx.beginPath();
-                    ctx.arc(b.x, b.y, b.size, 0, Math.PI*2);
-                    ctx.fill();
-
-                    if(b.y < H - Physics.liquidLevel) {
-                        Physics.bubbles.splice(i, 1); // Pop at surface
-                    }
+                    ctx.beginPath(); ctx.arc(b.x, b.y, b.size, 0, Math.PI*2); ctx.fill();
+                    if(b.y < H - Physics.liquidLevel) Physics.bubbles.splice(i, 1);
                 }
 
+                // 4. NEW: Draw Explosions
+                ctx.globalCompositeOperation = 'screen'; // Glow effect
+                for(let i = Physics.explosions.length - 1; i >= 0; i--) {
+                    let p = Physics.explosions[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.1; // Gravity
+                    p.life -= 0.02; // Fade out
+
+                    if(p.life <= 0) {
+                        Physics.explosions.splice(i, 1);
+                    } else {
+                        ctx.fillStyle = `rgba(${p.color}, ${p.life})`;
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+                        ctx.fill();
+                    }
+                }
+                ctx.globalCompositeOperation = 'source-over'; // Reset blend mode
+
+                ctx.restore(); // Restore from shake
                 requestAnimationFrame(Physics.loop);
             }
         };
@@ -539,8 +568,8 @@
         // --- 4. CHEMISTRY LOGIC ---
         const Lab = {
             state: {
-                liquid: null, // 'H2O', 'HCl', etc.
-                solutes: [], // Array of dissolved/added IDs
+                liquid: null,
+                solutes: [],
                 temp: 25,
                 heating: false,
                 stirring: false,
@@ -548,7 +577,6 @@
             },
 
             init: () => {
-                // Generate UI
                 const dock = document.getElementById('element-dock');
                 ELEMENTS.forEach(el => {
                     const card = document.createElement('div');
@@ -562,7 +590,7 @@
                     dock.appendChild(card);
                 });
                 Physics.init();
-                setInterval(Lab.thermalTick, 1000); // Temperature loop
+                setInterval(Lab.thermalTick, 1000);
             },
 
             reset: () => {
@@ -571,6 +599,7 @@
                 Physics.liquidLevel = 0;
                 Physics.debris = [];
                 Physics.bubbles = [];
+                Physics.explosions = []; // Clear effects
                 Lab.updateHUD(null);
                 document.getElementById('sw-heat').checked = false;
                 document.getElementById('sw-stir').checked = false;
@@ -580,9 +609,10 @@
             addElement: (el) => {
                 if(el.type === 'liq') {
                     if(Lab.state.liquid) {
-                        Lab.toast("Mixture contaminated. Flush required for pure results.", "warn");
-                        // Simple mixing visual
+                        Lab.toast(`Mixing ${el.id} into solution...`);
+                        Lab.state.solutes.push(el.id);
                         Physics.addLiquid(el.color);
+                        Lab.checkReaction();
                     } else {
                         Lab.state.liquid = el.id;
                         Lab.state.color = el.color;
@@ -613,10 +643,9 @@
                 if(Lab.state.heating && Lab.state.temp < 100) Lab.state.temp += 5;
                 if(!Lab.state.heating && Lab.state.temp > 25) Lab.state.temp -= 2;
                 document.getElementById('hud-temp').innerText = `${Lab.state.temp}°C`;
-                if(Lab.state.temp > 90 && Lab.state.liquid) Physics.createBubbles(2); // Boil
+                if(Lab.state.temp > 90 && Lab.state.liquid) Physics.createBubbles(2);
             },
 
-            // --- THE REACTION MATRIX ---
             checkReaction: () => {
                 const s = Lab.state;
                 const solutes = s.solutes;
@@ -624,34 +653,40 @@
                 
                 if(!liquid) return;
 
-                // Reaction: Alkali Metals + Water
+                // 1. NEUTRALIZATION
+                if( (liquid === 'HCl' && solutes.includes('NaOH')) || (liquid === 'NaOH' && solutes.includes('HCl')) ) {
+                    Lab.trigger("HCl + NaOH → NaCl + H₂O", "Neutralization. Exothermic heat generation.", [230,230,255], true);
+                    Lab.state.temp = Math.min(Lab.state.temp + 30, 100);
+                }
+
+                // 2. AQUA REGIA
+                if( (liquid === 'HCl' && solutes.includes('HNO3')) || (liquid === 'HNO3' && solutes.includes('HCl')) ) {
+                    Lab.trigger("3HCl + HNO₃ → NOCl + Cl₂ + 2H₂O", "Aqua Regia formed. Dangerous fumes.", [255, 140, 0], true);
+                    Physics.createBubbles(50, 'gas');
+                }
+
+                // 3. ALKALI METALS (Violent)
                 if(liquid === 'H2O') {
-                    if(solutes.includes('Na')) Lab.trigger("2Na + 2H₂O → 2NaOH + H₂", "Exothermic. Rapid Hydrogen release.", [255,255,255], true);
-                    if(solutes.includes('K')) Lab.trigger("2K + 2H₂O → 2KOH + H₂", "Violent! Lilac flame ignition.", [200,100,255], true);
-                    if(solutes.includes('Ca')) Lab.trigger("Ca + 2H₂O → Ca(OH)₂ + H₂", "Steady bubbling. White precipitate.", [240,240,255], false);
+                    if(solutes.includes('Na')) Lab.trigger("2Na + 2H₂O → 2NaOH + H₂", "Exothermic. Hydrogen ignition.", [255,255,255], true);
+                    if(solutes.includes('K')) Lab.trigger("2K + 2H₂O → 2KOH + H₂", "Highly Reactive! Lilac flame.", [200,100,255], true);
+                    if(solutes.includes('Ca')) Lab.trigger("Ca + 2H₂O → Ca(OH)₂ + H₂", "Steady bubbling. Precipitate.", [240,240,255], false);
                     
-                    // Salts Color Changes
                     if(solutes.includes('CuSO4')) { Physics.liquidColor = [0, 150, 255]; Lab.toast("Solution turned Blue (Copper II)"); }
                     if(solutes.includes('KMnO4')) { Physics.liquidColor = [180, 0, 180]; Lab.toast("Solution turned Purple (Permanganate)"); }
                 
-                    // Displacement: Fe + CuSO4
                     if(solutes.includes('CuSO4') && solutes.includes('Fe')) {
                         setTimeout(() => {
-                            Physics.liquidColor = [100, 200, 100]; // Greenish
-                            Lab.trigger("Fe + CuSO₄ → FeSO₄ + Cu", "Single Displacement. Iron replaces Copper.", [100,200,100], false);
+                            Physics.liquidColor = [100, 200, 100];
+                            Lab.trigger("Fe + CuSO₄ → FeSO₄ + Cu", "Displacement reaction.", [100,200,100], false);
                         }, 2000);
                     }
                 }
 
-                // Reaction: Acids + Metals
                 if((liquid === 'HCl' || liquid === 'H2SO4')) {
                     if(solutes.includes('Mg')) Lab.trigger("Mg + 2H⁺ → Mg²⁺ + H₂", "Rapid effervescence.", null, true);
                     if(solutes.includes('Zn')) Lab.trigger("Zn + 2H⁺ → Zn²⁺ + H₂", "Hydrogen gas evolution.", null, true);
-                    if(solutes.includes('Fe')) Lab.trigger("Fe + 2H⁺ → Fe²⁺ + H₂", "Slow bubbling. Pale green solution.", [200,255,200], true);
-                    if(solutes.includes('Cu')) {
-                        if(liquid === 'HNO3') Lab.trigger("Cu + 4HNO₃ → Cu(NO₃)₂ + 2NO₂ + 2H₂O", "Toxic brown NO₂ gas released!", [0, 100, 0], true);
-                        else if(Lab.state.heating) Lab.toast("Reaction requires oxidizer or higher temp.", "warn");
-                    }
+                    if(solutes.includes('Fe')) Lab.trigger("Fe + 2H⁺ → Fe²⁺ + H₂", "Slow bubbling.", [200,255,200], true);
+                    if(solutes.includes('Cu') && liquid === 'HNO3') Lab.trigger("Cu + 4HNO₃ → Cu(NO₃)₂ + 2NO₂", "Toxic brown gas!", [0, 100, 0], true);
                 }
             },
 
@@ -660,12 +695,12 @@
                 if(newColor) Physics.liquidColor = newColor;
                 if(violent) {
                     Physics.createBubbles(50, 'gas');
-                    Lab.toast("REACTION OCCURRING", "warn");
+                    // TRIGGER THE VISUAL EXPLOSION
+                    Physics.explode(); 
+                    Lab.toast("REACTION CRITICAL", "warn");
                 }
-                
-                // Clear solutes processed (simplified)
                 Lab.state.solutes = []; 
-                Physics.debris = []; // Dissolve visuals
+                Physics.debris = []; 
             },
 
             updateHUD: (eq, desc) => {
@@ -690,7 +725,6 @@
             }
         };
 
-        // Initialize Auth on Load
         window.onload = Auth.init;
 
     </script>
