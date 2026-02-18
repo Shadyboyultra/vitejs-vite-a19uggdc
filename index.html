@@ -266,7 +266,7 @@
     </header>
 
     <div id="element-dock">
-        </div>
+    </div>
 
     <div class="stage">
         <div class="toast-container" id="toast-area"></div>
@@ -401,12 +401,12 @@
             targetLevel: 0,
             liquidColor: [200, 240, 255],
             liquidAlpha: 0,
-            shake: 0, // Shake magnitude
+            shake: 0, 
             
             // Particles
             bubbles: [],
             debris: [],
-            explosions: [], // NEW: Explosion particle system
+            explosions: [], 
             
             init: () => {
                 const cvs = document.getElementById('sim-canvas');
@@ -438,9 +438,8 @@
                 }
             },
 
-            // NEW: Create visual explosion
             explode: () => {
-                Physics.shake = 20; // Set shake intensity
+                Physics.shake = 20; 
                 const count = 60;
                 const centerX = Physics.width / 2;
                 const centerY = Physics.height - Physics.liquidLevel;
@@ -448,7 +447,6 @@
                 for(let i=0; i<count; i++) {
                     const angle = Math.random() * Math.PI * 2;
                     const speed = Math.random() * 8 + 2;
-                    // Colors: White, Yellow, Orange, Red
                     const colors = ['255,255,255', '255,200,50', '255,100,0', '255,50,50'];
                     const col = colors[Math.floor(Math.random() * colors.length)];
                     
@@ -458,7 +456,7 @@
                         vx: Math.cos(angle) * speed,
                         vy: Math.sin(angle) * speed,
                         size: Math.random() * 6 + 2,
-                        life: 1.0, // Alpha/Life
+                        life: 1.0, 
                         color: col
                     });
                 }
@@ -482,19 +480,17 @@
                 const H = Physics.height;
                 Physics.frame++;
 
-                // Camera Shake Effect
                 ctx.save();
                 if(Physics.shake > 0) {
                     const dx = (Math.random() - 0.5) * Physics.shake;
                     const dy = (Math.random() - 0.5) * Physics.shake;
                     ctx.translate(dx, dy);
-                    Physics.shake *= 0.9; // Damping
+                    Physics.shake *= 0.9; 
                     if(Physics.shake < 0.5) Physics.shake = 0;
                 }
 
                 ctx.clearRect(0, 0, W, H);
 
-                // 1. Draw Liquid
                 if(Physics.liquidLevel > 0.1 || Physics.targetLevel > 0.1) {
                     Physics.liquidLevel += (Physics.targetLevel - Physics.liquidLevel) * 0.05;
                     ctx.beginPath();
@@ -514,7 +510,6 @@
                     ctx.fill();
                 }
 
-                // 2. Draw Debris
                 Physics.debris.forEach((d) => {
                     d.x += d.vx;
                     d.y += d.vy;
@@ -528,7 +523,6 @@
                     ctx.beginPath(); ctx.arc(d.x, d.y, d.size, 0, Math.PI*2); ctx.fill();
                 });
 
-                // 3. Draw Bubbles
                 if(Lab.state.heating && Physics.liquidLevel > 50 && Physics.frame % 5 === 0) Physics.createBubbles(1);
                 for(let i = Physics.bubbles.length - 1; i >= 0; i--) {
                     let b = Physics.bubbles[i];
@@ -540,14 +534,13 @@
                     if(b.y < H - Physics.liquidLevel) Physics.bubbles.splice(i, 1);
                 }
 
-                // 4. NEW: Draw Explosions
-                ctx.globalCompositeOperation = 'screen'; // Glow effect
+                ctx.globalCompositeOperation = 'screen'; 
                 for(let i = Physics.explosions.length - 1; i >= 0; i--) {
                     let p = Physics.explosions[i];
                     p.x += p.vx;
                     p.y += p.vy;
-                    p.vy += 0.1; // Gravity
-                    p.life -= 0.02; // Fade out
+                    p.vy += 0.1; 
+                    p.life -= 0.02; 
 
                     if(p.life <= 0) {
                         Physics.explosions.splice(i, 1);
@@ -558,22 +551,23 @@
                         ctx.fill();
                     }
                 }
-                ctx.globalCompositeOperation = 'source-over'; // Reset blend mode
+                ctx.globalCompositeOperation = 'source-over'; 
 
-                ctx.restore(); // Restore from shake
+                ctx.restore(); 
                 requestAnimationFrame(Physics.loop);
             }
         };
 
-        // --- 4. CHEMISTRY LOGIC ---
+        // --- 4. CHEMISTRY LOGIC (UPDATED) ---
         const Lab = {
             state: {
                 liquid: null,
-                solutes: [],
+                allElements: [], // Tracks every element added for multi-equations
                 temp: 25,
                 heating: false,
                 stirring: false,
-                color: null
+                color: null,
+                reactionTriggered: false // Tracks if we need to prompt the user
             },
 
             init: () => {
@@ -594,12 +588,12 @@
             },
 
             reset: () => {
-                Lab.state = { liquid: null, solutes: [], temp: 25, heating: false, stirring: false, color: null };
+                Lab.state = { liquid: null, allElements: [], temp: 25, heating: false, stirring: false, color: null, reactionTriggered: false };
                 Physics.targetLevel = 0;
                 Physics.liquidLevel = 0;
                 Physics.debris = [];
                 Physics.bubbles = [];
-                Physics.explosions = []; // Clear effects
+                Physics.explosions = []; 
                 Lab.updateHUD(null);
                 document.getElementById('sw-heat').checked = false;
                 document.getElementById('sw-stir').checked = false;
@@ -607,10 +601,17 @@
             },
 
             addElement: (el) => {
+                // Check if a reaction already happened and prompt the user
+                if (Lab.state.reactionTriggered) {
+                    const confirmAdd = window.confirm(`A reaction has already occurred. Do you want to add ${el.name} (${el.id}) to the current equation?`);
+                    if (!confirmAdd) return; // Cancel if they click "Cancel"
+                }
+
+                Lab.state.allElements.push(el.id);
+
                 if(el.type === 'liq') {
                     if(Lab.state.liquid) {
                         Lab.toast(`Mixing ${el.id} into solution...`);
-                        Lab.state.solutes.push(el.id);
                         Physics.addLiquid(el.color);
                         Lab.checkReaction();
                     } else {
@@ -619,12 +620,17 @@
                         Physics.addLiquid(el.color);
                     }
                 } else if (el.type === 'sol' || el.type === 'salt') {
-                    if(!Lab.state.liquid) return Lab.toast("Add a solvent liquid first.", "warn");
+                    if(!Lab.state.liquid) {
+                        Lab.state.allElements.pop(); // Remove it if invalid
+                        return Lab.toast("Add a solvent liquid first.", "warn");
+                    }
                     Physics.addDebris(el.color, 5);
-                    Lab.state.solutes.push(el.id);
                     Lab.checkReaction();
                 } else if (el.type === 'gas') {
-                    if(Lab.state.liquid) Physics.createBubbles(20, 'gas');
+                    if(Lab.state.liquid) {
+                        Physics.createBubbles(20, 'gas');
+                        Lab.checkReaction();
+                    }
                 }
             },
 
@@ -644,49 +650,68 @@
                 if(!Lab.state.heating && Lab.state.temp > 25) Lab.state.temp -= 2;
                 document.getElementById('hud-temp').innerText = `${Lab.state.temp}°C`;
                 if(Lab.state.temp > 90 && Lab.state.liquid) Physics.createBubbles(2);
+                
+                if(Lab.state.heating) Lab.checkReaction();
             },
 
             checkReaction: () => {
                 const s = Lab.state;
-                const solutes = s.solutes;
-                const liquid = s.liquid;
-                
-                if(!liquid) return;
+                const all = s.allElements;
+                if(!s.liquid || all.length < 2) return;
 
-                // 1. NEUTRALIZATION
-                if( (liquid === 'HCl' && solutes.includes('NaOH')) || (liquid === 'NaOH' && solutes.includes('HCl')) ) {
-                    Lab.trigger("HCl + NaOH → NaCl + H₂O", "Neutralization. Exothermic heat generation.", [230,230,255], true);
-                    Lab.state.temp = Math.min(Lab.state.temp + 30, 100);
+                const has = (id) => all.includes(id);
+
+                // --- 3+ ELEMENT COMBINATIONS ---
+                if (all.length >= 3) {
+                    let reactants = all.join(' + ');
+                    let products = "Complex Aqueous Mixture";
+                    let isViolent = true;
+
+                    if (has('H2O') && has('Na') && has('HCl')) {
+                        products = "NaCl + H₂O + H₂↑";
+                    } else if (has('H2O') && has('CuSO4') && has('Fe')) {
+                        products = "FeSO₄ + Cu↓ + H₂O";
+                        isViolent = false;
+                    } else if (has('HCl') && has('HNO3') && has('Cu')) {
+                        products = "CuCl₂ + NO↑ + 2H₂O";
+                    }
+
+                    Lab.trigger(`${reactants} → ${products}`, "Multi-stage compound reaction.", [150, 160, 150], isViolent);
+                    return; 
                 }
 
-                // 2. AQUA REGIA
-                if( (liquid === 'HCl' && solutes.includes('HNO3')) || (liquid === 'HNO3' && solutes.includes('HCl')) ) {
+                // --- 2 ELEMENT COMBINATIONS ---
+                if (has('HCl') && has('NaOH')) {
+                    Lab.trigger("HCl + NaOH → NaCl + H₂O", "Neutralization. Exothermic heat.", [230,230,255], true);
+                    Lab.state.temp = Math.min(Lab.state.temp + 30, 100);
+                }
+                if (has('HCl') && has('HNO3')) {
                     Lab.trigger("3HCl + HNO₃ → NOCl + Cl₂ + 2H₂O", "Aqua Regia formed. Dangerous fumes.", [255, 140, 0], true);
                     Physics.createBubbles(50, 'gas');
                 }
-
-                // 3. ALKALI METALS (Violent)
-                if(liquid === 'H2O') {
-                    if(solutes.includes('Na')) Lab.trigger("2Na + 2H₂O → 2NaOH + H₂", "Exothermic. Hydrogen ignition.", [255,255,255], true);
-                    if(solutes.includes('K')) Lab.trigger("2K + 2H₂O → 2KOH + H₂", "Highly Reactive! Lilac flame.", [200,100,255], true);
-                    if(solutes.includes('Ca')) Lab.trigger("Ca + 2H₂O → Ca(OH)₂ + H₂", "Steady bubbling. Precipitate.", [240,240,255], false);
-                    
-                    if(solutes.includes('CuSO4')) { Physics.liquidColor = [0, 150, 255]; Lab.toast("Solution turned Blue (Copper II)"); }
-                    if(solutes.includes('KMnO4')) { Physics.liquidColor = [180, 0, 180]; Lab.toast("Solution turned Purple (Permanganate)"); }
                 
-                    if(solutes.includes('CuSO4') && solutes.includes('Fe')) {
-                        setTimeout(() => {
-                            Physics.liquidColor = [100, 200, 100];
-                            Lab.trigger("Fe + CuSO₄ → FeSO₄ + Cu", "Displacement reaction.", [100,200,100], false);
-                        }, 2000);
-                    }
+                if (s.liquid === 'H2O') {
+                    if(has('Na')) Lab.trigger("2Na + 2H₂O → 2NaOH + H₂", "Exothermic. Hydrogen ignition.", [255,255,255], true);
+                    if(has('K')) Lab.trigger("2K + 2H₂O → 2KOH + H₂", "Highly Reactive! Lilac flame.", [200,100,255], true);
+                    if(has('Ca')) Lab.trigger("Ca + 2H₂O → Ca(OH)₂ + H₂", "Steady bubbling. Precipitate.", [240,240,255], false);
+                    if(has('Cl2')) Lab.trigger("Cl₂ + H₂O → HCl + HClO", "Chlorine water formed.", [180,255,180], false); 
+                    
+                    if(has('CuSO4')) { Physics.liquidColor = [0, 150, 255]; Lab.toast("Solution turned Blue"); }
+                    if(has('KMnO4')) { Physics.liquidColor = [180, 0, 180]; Lab.toast("Solution turned Purple"); }
                 }
 
-                if((liquid === 'HCl' || liquid === 'H2SO4')) {
-                    if(solutes.includes('Mg')) Lab.trigger("Mg + 2H⁺ → Mg²⁺ + H₂", "Rapid effervescence.", null, true);
-                    if(solutes.includes('Zn')) Lab.trigger("Zn + 2H⁺ → Zn²⁺ + H₂", "Hydrogen gas evolution.", null, true);
-                    if(solutes.includes('Fe')) Lab.trigger("Fe + 2H⁺ → Fe²⁺ + H₂", "Slow bubbling.", [200,255,200], true);
-                    if(solutes.includes('Cu') && liquid === 'HNO3') Lab.trigger("Cu + 4HNO₃ → Cu(NO₃)₂ + 2NO₂", "Toxic brown gas!", [0, 100, 0], true);
+                if (has('HCl') || has('H2SO4')) {
+                    if(has('Mg')) Lab.trigger("Mg + 2H⁺ → Mg²⁺ + H₂", "Rapid effervescence.", null, true);
+                    if(has('Zn')) Lab.trigger("Zn + 2H⁺ → Zn²⁺ + H₂", "Hydrogen gas evolution.", null, true);
+                    if(has('Fe')) Lab.trigger("Fe + 2H⁺ → Fe²⁺ + H₂", "Slow bubbling.", [200,255,200], true);
+                    if(has('Al') && has('HCl')) Lab.trigger("2Al + 6HCl → 2AlCl₃ + 3H₂", "Vigorous reaction, heat released.", [220,220,220], true); 
+                }
+                if (has('Cu') && has('HNO3')) {
+                    Lab.trigger("Cu + 4HNO₃ → Cu(NO₃)₂ + 2NO₂", "Toxic brown gas!", [0, 100, 0], true);
+                }
+                
+                if (has('C') && has('H2SO4') && s.heating) {
+                    Lab.trigger("C + 2H₂SO₄ → CO₂ + 2SO₂ + 2H₂O", "Carbon oxidized by hot acid.", [50, 50, 50], true); 
                 }
             },
 
@@ -695,12 +720,11 @@
                 if(newColor) Physics.liquidColor = newColor;
                 if(violent) {
                     Physics.createBubbles(50, 'gas');
-                    // TRIGGER THE VISUAL EXPLOSION
                     Physics.explode(); 
                     Lab.toast("REACTION CRITICAL", "warn");
                 }
-                Lab.state.solutes = []; 
                 Physics.debris = []; 
+                Lab.state.reactionTriggered = true; 
             },
 
             updateHUD: (eq, desc) => {
